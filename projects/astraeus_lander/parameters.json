@@ -1,0 +1,10 @@
+{
+  "height_mm": 480,
+  "wall_mm": 2.4,
+  "clearance_mm": 0.3,
+  "joint_height_mm": 6,
+  "thermal_band_height_mm": 24,
+  "tile_side_mm": 2.0,
+  "fin_thickness_mm": 3.2,
+  "nose_tip_height_mm": 28
+}

@@ -1,0 +1,2 @@
+# Additional project-specific solid-interference checker; the toolkit itself stays small.
+manifold3d==3.5.4

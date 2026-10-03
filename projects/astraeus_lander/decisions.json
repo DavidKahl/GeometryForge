@@ -1,0 +1,28 @@
+{
+    "brief":  "Reconstruct the user-supplied Astraeus Heavy Lander concept as a detailed multipart printable display model",
+    "intended_use":  "480 mm display model from user-supplied concept, multipart FDM",
+    "units":  "mm",
+    "deliverables":  "both",
+    "execution_backend":  "blender",
+    "print":  {
+                  "bed_mm":  [
+                                 256,
+                                 256,
+                                 250
+                             ],
+                  "nozzle_mm":  0.4,
+                  "printer":  "Bambu X2D (user specified)",
+                  "height_limit_note":  "250 mm conservative validation limit; only XY bed was specified by user"
+              },
+    "unresolved":  [
+
+                   ],
+    "reference":  "User-provided Astraeus Heavy Lander concept sheet, 3 October 2026",
+    "assumptions":  [
+                        "1:150 nominal scale; 480 mm total height",
+                        "Confirmed by user: 480 mm model, 0.4 mm FDM nozzle, 256 mm bed, Bambu X2D. Suggested 0.12-0.16 mm layers.",
+                        "Silhouette takes precedence over inconsistent upper-canard span annotation",
+                        "Deployed legs are static; fins/canards separate; glue optional after test fitting",
+                        "Surface details enlarged where needed for printing"
+                    ]
+}
