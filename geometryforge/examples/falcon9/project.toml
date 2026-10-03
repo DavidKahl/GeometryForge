@@ -1,0 +1,48 @@
+format_version = 1
+[project]
+id = "falcon9"
+title = "Falcon9"
+[backends.blender]
+entry = "models/blender.py"
+[backends.houdini]
+entry = "models/houdini.py"
+[parts.stage1]
+sources = ["models/assembly.py", "models/stage1.py"]
+parameters = ["radius", "stage1_height", "joint_width", "joint_depth", "joint_height", "clearance"]
+depends = []
+[parts.stage2]
+sources = ["models/assembly.py", "models/stage2.py"]
+parameters = ["radius", "stage1_height", "stage2_height", "joint_width", "joint_depth", "joint_height", "clearance"]
+depends = []
+[parts.fairing]
+sources = ["models/assembly.py", "models/fairing.py"]
+parameters = ["radius", "stage1_height", "stage2_height", "fairing_height", "fairing_radius", "joint_width", "joint_depth", "joint_height", "clearance"]
+depends = []
+[parts.legs]
+sources = ["models/assembly.py", "models/legs.py"]
+parameters = ["radius", "leg_length"]
+depends = []
+[parts.stand]
+sources = ["models/assembly.py", "models/stand.py"]
+parameters = ["radius", "clearance"]
+depends = []
+[parts.coupon]
+sources = ["models/assembly.py", "models/coupon.py"]
+parameters = ["joint_width", "joint_depth", "joint_height", "clearance"]
+depends = []
+[checks.lower_joint]
+source = "checks/verify.py"
+parts = ["stage1", "stage2"]
+parameters = ["radius", "stage1_height", "stage2_height", "joint_width", "joint_depth", "joint_height", "clearance"]
+[checks.upper_joint]
+source = "checks/verify.py"
+parts = ["stage2", "fairing"]
+parameters = ["radius", "stage1_height", "stage2_height", "fairing_height", "fairing_radius", "joint_width", "joint_depth", "joint_height", "clearance"]
+[checks.stand_fit]
+source = "checks/verify.py"
+parts = ["stand", "stage1"]
+parameters = ["radius", "clearance"]
+[checks.coupon_fit]
+source = "checks/verify.py"
+parts = ["coupon"]
+parameters = ["joint_width", "joint_depth", "joint_height", "clearance"]

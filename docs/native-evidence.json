@@ -1,0 +1,119 @@
+{
+  "platform": "win32",
+  "checks": [
+    {
+      "name": "organizer native build/reopen/print checks",
+      "passed": true,
+      "seconds": 6.67,
+      "details": {
+        "run": "20261003T104137Z-a1281d6a",
+        "backends": {
+          "blender": {
+            "version": "5.2.1 LTS",
+            "license": null,
+            "structure": {
+              "native_objects": 4,
+              "modifiers": 3
+            }
+          },
+          "houdini": {
+            "version": "22.0.368",
+            "license": "licenseCategoryType.Apprentice",
+            "structure": {
+              "native_nodes": 22
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "rocket native build/reopen/print checks",
+      "passed": true,
+      "seconds": 17.55,
+      "details": {
+        "run": "20261003T104144Z-0d2d3776",
+        "backends": {
+          "blender": {
+            "version": "5.2.1 LTS",
+            "license": null,
+            "structure": {
+              "native_objects": 32,
+              "modifiers": 22
+            }
+          },
+          "houdini": {
+            "version": "22.0.368",
+            "license": "licenseCategoryType.Apprentice",
+            "structure": {
+              "native_nodes": 172
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "fairing-only incremental update in both applications",
+      "passed": true,
+      "seconds": 7.09,
+      "details": {
+        "run": "20261003T104201Z-d83b7ee9",
+        "rebuilt": [
+          "fairing"
+        ],
+        "fresh_checks": [
+          "upper_joint"
+        ],
+        "reused_parts": 5,
+        "reused_checks": 3
+      }
+    },
+    {
+      "name": "shared clearance invalidates both joint sides",
+      "passed": true,
+      "seconds": 17.16,
+      "details": {
+        "run": "20261003T104208Z-dbc99921",
+        "fresh_checks": 4,
+        "legs_reused": true
+      }
+    },
+    {
+      "name": "blender saved manual edit, full verification, safe-point restore",
+      "passed": true,
+      "seconds": 10.25,
+      "details": {
+        "run": "20261003T104228Z-355699bf",
+        "source_preserved": true,
+        "builders_invoked": 0,
+        "changed_parts": [
+          "legs"
+        ],
+        "full_checks_executed": 4,
+        "restore": true
+      }
+    },
+    {
+      "name": "houdini saved manual edit, full verification, safe-point restore",
+      "passed": true,
+      "seconds": 9.23,
+      "details": {
+        "run": "20261003T104238Z-5de6fd7e",
+        "source_preserved": true,
+        "builders_invoked": 0,
+        "changed_parts": [
+          "legs"
+        ],
+        "full_checks_executed": 4,
+        "restore": true
+      }
+    },
+    {
+      "name": "return to matching native safe scenes",
+      "passed": true,
+      "seconds": 3.12,
+      "details": {
+        "run": "20261003T104245Z-1d08d08f"
+      }
+    }
+  ]
+}

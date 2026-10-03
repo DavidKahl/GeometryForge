@@ -1,0 +1,16 @@
+format_version = 1
+[project]
+id = "desk_organizer"
+title = "Desk Organizer"
+[backends.blender]
+entry = "models/blender.py"
+[backends.houdini]
+entry = "models/houdini.py"
+[parts.organizer]
+sources = ["models/assembly.py", "models/organizer.py"]
+parameters = ["count", "width", "depth", "height", "wall", "floor"]
+depends = []
+[checks.cavities]
+source = "checks/verify.py"
+parts = ["organizer"]
+parameters = ["count", "width", "depth", "height", "wall", "floor"]

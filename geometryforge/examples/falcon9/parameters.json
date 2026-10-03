@@ -1,0 +1,12 @@
+{
+  "radius": 15,
+  "stage1_height": 110,
+  "stage2_height": 55,
+  "fairing_height": 40,
+  "fairing_radius": 17,
+  "joint_width": 8,
+  "joint_depth": 6,
+  "joint_height": 5,
+  "clearance": 0.25,
+  "leg_length": 22
+}

@@ -1,0 +1,13 @@
+# Project contract v1
+
+The project directory contains project.toml, parameters.json, decisions.json, models/, checks/, working/ and .geometryforge/. The last two are local outputs. Geometry uses millimeters.
+
+project.toml has format_version=1, [project] id/title, [backends.blender] and/or [backends.houdini] with an entry path. Each [parts.<id>] declares sources (all Python/helpers influencing this part), parameters (keys), and depends (other part IDs whose changes affect this part). Cyclic mating dependencies are permitted; closure stops at a fixed point. Each [checks.<id>] declares source, optional helper sources, parts and parameters. Declare every input; undeclared dependencies defeat evidence reuse.
+
+Native entrypoints expose `build_parts(parameters, parts, api)`. For each selected part call api.begin(part), build native geometry, then api.finish(object). begin removes only that part's owned objects/nodes. Use native_api convenience operations or direct bpy/hou, keeping stable gf_owner and gf_part metadata. Separate Printable, Construction and Presentation geometry. Authoring arbitrary native geometry is supported; the supplied vocabulary is a convenience, not a required modeling language.
+
+Check entrypoints expose `verify(payload)` returning a JSON object with passed=true and useful measurements, or raise on failure. payload contains parameters, check name, and objects grouped by the declared part IDs. Checks run in separate host processes. Check actual evaluated geometry and interfaces, not merely parameter arithmetic. Register every check needed for a safe point.
+
+Decisions include brief, intended_use, units=mm, deliverables, execution_backend, print.bed_mm, print.nozzle_mm, and unresolved. Store additional dimensions/preferences as needed. Run manifests record snapshots, backend versions, geometry fingerprints, artifacts and evidence provenance.
+
+CLI emits JSON and exits 2 for candidates/failures, 1 for command errors. `history`, `context`, `plan` are read-only. `adopt <project> --backend blender --file path.blend` copies a saved external edit into managed working storage. `restore` creates a separate copy without deleting current work. `verify --full` loads native scenes and executes all checks without invoking builders.

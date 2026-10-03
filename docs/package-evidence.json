@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "imported_from_installed_wheel": true,
+  "skill_installed_in_both_harnesses": true,
+  "example_built_and_verified": true,
+  "viewer_assets_present": true,
+  "run": "20261003T104328Z-8f3a4f51",
+  "wheel_sha256": "ce5678dc6439b3ba6c2feb30e38daf925fc2c87718063162084aa3854f61f65d"
+}
