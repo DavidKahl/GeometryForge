@@ -41,6 +41,8 @@ Then ask your agent, for example:
 
 > Use GeometryForge to make this organizer 150 mm wide with four compartments. Keep both native projects editable, reuse unaffected checks, and show me the resulting run.
 
+For print work, the skill establishes the target printer/process and a part-level print plan before detailed modeling. Usable build space, nozzle/line settings, material, load direction, removable supports and calibrated fits guide the geometry. Printer changes trigger reassessment of affected parts. See [printer-aware modeling](geometryforge/skill/references/printing.md) for the workflow and the distinction between mesh checks, slicer review and physical testing.
+
 ## Edits, runs and safe points
 
 - A **working file** is editable. Save changes in Blender/Houdini before asking the agent to inspect them.
