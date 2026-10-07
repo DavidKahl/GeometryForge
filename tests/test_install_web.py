@@ -35,7 +35,11 @@ def test_viewer_catalog_security_and_artifacts(project):
     assert client.get(f'/api/projects/{key}/context').json()['safe_point']==result['id']
     runs=client.get(f'/api/projects/{key}/runs').json();assert runs[0]['status']=='passed'
     native=result['backends']['blender']['native']['path']
-    assert client.get(f'/api/projects/{key}/artifact',params={'path':native}).status_code==200
+    served=client.get(f'/api/projects/{key}/artifact',params={'path':native})
+    assert served.status_code==200 and served.headers['content-disposition'].startswith('attachment')
+    inline=client.get(f'/api/projects/{key}/artifact',params={'path':native,'inline':1})
+    assert inline.status_code==200 and inline.headers['content-disposition'].startswith('inline')
+    assert client.get(f'/api/projects/{key}/artifact',params={'path':'decisions.json','inline':1}).status_code==404
     assert client.get(f'/api/projects/{key}/artifact',params={'path':'decisions.json'}).status_code==404
     assert client.get(f'/api/projects/{key}/artifact',params={'path':'../secret.txt'}).status_code==400
     assert client.post('/api/projects',headers=headers,json={'path':str(root.parent/'empty'),'create':True,'id':'empty'}).status_code==200

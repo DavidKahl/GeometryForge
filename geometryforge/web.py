@@ -73,7 +73,7 @@ def create_app():
         return result
 
     @app.get('/api/projects/{key}/artifact')
-    def download(key: str, path: str):
+    def download(key: str, path: str, inline: bool = False):
         root=project(key)
         target=inside(root,path)
         # Only retained run artifacts can be served, never arbitrary source files.
@@ -81,7 +81,8 @@ def create_app():
             raise HTTPException(404,'Artifact not found')
         if target.suffix not in ('.json','.png','.stl','.3mf','.blend','.hip','.hipnc','.hiplc','.log'):
             raise HTTPException(404,'Unsupported artifact type')
-        return FileResponse(target,filename=target.name)
+        # inline lets the viewer show images and logs in place; downloads stay the default.
+        return FileResponse(target,filename=target.name,content_disposition_type='inline' if inline else 'attachment')
 
     app.mount('/',StaticFiles(directory=PACKAGE/'web_dist',html=True),name='viewer')
     return app
