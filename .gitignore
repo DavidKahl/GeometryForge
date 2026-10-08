@@ -11,3 +11,6 @@ working/
 test-results/
 playwright-report/
 validation-workspace/
+
+# Local-only projects (not part of the public showcase)
+projects/office_led_hub_v2/
