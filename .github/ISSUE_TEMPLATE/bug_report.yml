@@ -1,0 +1,30 @@
+name: Bug report
+description: Something doesn't work as documented
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command and output
+      description: The geometryforge command you ran and the JSON it printed (or the viewer screen). Remove anything private.
+      render: shell
+  - type: textarea
+    id: doctor
+    attributes:
+      label: geometryforge doctor
+      description: Output of `uv run geometryforge doctor`
+      render: json
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      description: OS, GeometryForge version (`geometryforge --version`), Blender/Houdini versions, agent (Claude Code / Codex)
+    validations:
+      required: true

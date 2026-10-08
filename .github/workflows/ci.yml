@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv sync --frozen --extra viewer --extra dev
+      # Blender, Houdini and Bambu Studio are not available on CI runners; tests that need them skip themselves.
+      - run: uv run pytest -q
+      - run: uv build
+
+  viewer:
+    name: Viewer build and browser tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - run: uv sync --frozen --extra viewer --extra dev
+      - run: npm ci --prefix ui
+      - run: npm run build --prefix ui
+      - name: Bundled viewer matches the sources
+        run: git diff --exit-code -- geometryforge/web_dist
+      - name: Browser tests (generated fixture projects, no native apps)
+        working-directory: ui
+        run: |
+          npx playwright install --with-deps chromium
+          npm test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-results
+          path: ui/test-results
