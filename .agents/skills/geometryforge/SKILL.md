@@ -27,7 +27,7 @@ Test uncertain features with a small representative section or fit coupon before
 
 Start each resumed modeling task with `context`. Native working files, parameter choices, stale outputs and safe points belong to the project, not conversation memory. Read the referenced latest/safe run when its detailed evidence matters.
 
-Run `geometryforge plan <project>` before execution. Use the smallest meaningful part selection; maintain source, parameter, dependency and interface-check declarations as geometry evolves. A new run record does not imply rebuilding the whole model. Example: `geometryforge run <project> --parts fairing`.
+Run `geometryforge plan <project>` before execution. Use the smallest meaningful part selection; maintain source, parameter, dependency and interface-check declarations as geometry evolves. A new run record does not imply rebuilding the whole model. Example: `geometryforge run <project> --parts nose_tip`.
 
 A change of printer, nozzle, material, layer/line settings, support policy or fit calibration requires reassessing the affected print plan. Update the geometry-driving parameters and check dependencies, not just a printer label; see [printing](references/printing.md#printer-and-process-changes). Preserve existing native edits during that reassessment.
 

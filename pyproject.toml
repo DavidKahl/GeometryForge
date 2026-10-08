@@ -1,15 +1,35 @@
 [project]
 name = "geometryforge"
 version = "1.0.0"
-description = "Agent-led native modeling, incremental validation, and local run inspection"
+description = "Agent-led native Blender/Houdini modeling for 3D printing, with incremental validation and a local run viewer"
 readme = "README.md"
 license = "MIT"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+authors = [{ name = "David Kahl" }]
 requires-python = ">=3.12,<3.13"
+keywords = ["3d-printing", "blender", "houdini", "3mf", "stl", "claude-code", "codex", "ai-agents", "procedural-modeling"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Developers",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Graphics :: 3D Modeling",
+    "Topic :: Scientific/Engineering",
+]
 dependencies = ["numpy>=2,<3", "scipy>=1.15,<2", "trimesh>=4.6,<5", "networkx>=3,<4", "psutil>=7,<8", "pillow>=11,<13"]
 
 [project.optional-dependencies]
 viewer = ["fastapi>=0.115,<1", "uvicorn>=0.34,<1"]
 dev = ["pytest>=8,<10", "httpx>=0.28,<1", "build>=1,<2"]
+
+[project.urls]
+Homepage = "https://github.com/DavidKahl/GeometryForge"
+Documentation = "https://github.com/DavidKahl/GeometryForge/blob/main/docs/GUIDE.md"
+Issues = "https://github.com/DavidKahl/GeometryForge/issues"
+Changelog = "https://github.com/DavidKahl/GeometryForge/blob/main/CHANGELOG.md"
 
 [project.scripts]
 geometryforge = "geometryforge.__main__:main"

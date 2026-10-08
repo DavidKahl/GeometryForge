@@ -10,18 +10,43 @@ def main():
     parser = argparse.ArgumentParser(prog='geometryforge')
     parser.add_argument('--version', action='version', version=__version__)
     parser.add_argument('--json', action='store_true', help='Explicit machine-readable mode (all commands already emit JSON)')
-    sub = parser.add_subparsers(dest='command', required=True)
-    p = sub.add_parser('install-skill'); p.add_argument('--target'); p.add_argument('--user', action='store_true'); p.add_argument('--harness', choices=['codex','claude','both'], default='both')
-    sub.add_parser('doctor')
-    p = sub.add_parser('init'); p.add_argument('destination'); p.add_argument('--example', choices=['desk_organizer']); p.add_argument('--id'); p.add_argument('--deliverables', choices=['geometry','blender','houdini','both'], default='both'); p.add_argument('--backend', choices=['blender','houdini'], default='blender'); p.add_argument('--brief', default=''); p.add_argument('--bed', nargs=3,type=float,default=[220,220,250])
-    for name in ['context','status','history','register']:
-        p = sub.add_parser(name); p.add_argument('project', nargs='?', default='.')
-    for name in ['plan','run','verify']:
-        p = sub.add_parser(name); p.add_argument('project', nargs='?', default='.'); p.add_argument('--backend',choices=['blender','houdini']); p.add_argument('--parts',nargs='*',default=[]); p.add_argument('--full',action='store_true'); p.add_argument('--source',choices=['auto','scene','code'],default='auto'); p.add_argument('--timeout',type=int,default=900); p.add_argument('--blender'); p.add_argument('--houdini')
-    p=sub.add_parser('restore'); p.add_argument('project',nargs='?',default='.'); p.add_argument('--run')
-    p=sub.add_parser('adopt'); p.add_argument('project'); p.add_argument('--backend',choices=['blender','houdini'],required=True); p.add_argument('--file',required=True)
-    p=sub.add_parser('viewer'); p.add_argument('--port',type=int,default=8743)
-    p=sub.add_parser('session'); p.add_argument('action',choices=['status','stop'])
+    sub = parser.add_subparsers(dest='command', required=True, metavar='command')
+    p = sub.add_parser('install-skill', help='Install the agent skill for Claude Code and/or Codex')
+    p.add_argument('--target', help='Workspace folder to install into (default: current folder)')
+    p.add_argument('--user', action='store_true', help='Install for your user account instead of one workspace')
+    p.add_argument('--harness', choices=['codex','claude','both'], default='both', help='Which agent harness to install for')
+    sub.add_parser('doctor', help='Report the Blender, Houdini and Bambu Studio executables that will be used')
+    p = sub.add_parser('init', help='Create a new project folder (empty or from a bundled example)')
+    p.add_argument('destination', help='Empty or new project folder')
+    p.add_argument('--example', choices=['desk_organizer'], help='Start from a bundled example')
+    p.add_argument('--id', help='Project ID (lowercase, underscores; default: folder name)')
+    p.add_argument('--deliverables', choices=['geometry','blender','houdini','both'], default='both', help='Native files to produce')
+    p.add_argument('--backend', choices=['blender','houdini'], default='blender', help="Application used when deliverables is 'geometry'")
+    p.add_argument('--brief', default='', help='One-line design brief')
+    p.add_argument('--bed', nargs=3, type=float, default=[220,220,250], metavar=('X','Y','Z'), help='Printer build volume in mm')
+    descriptions = {'context': 'Show decisions, parameters, safe point and backend state (start here)', 'status': 'Alias of context',
+                    'history': 'List all run records, newest first', 'register': 'Add an existing project to the viewer catalog'}
+    for name, text in descriptions.items():
+        p = sub.add_parser(name, help=text); p.add_argument('project', nargs='?', default='.', help='Project folder (default: current folder)')
+    descriptions = {'plan': 'Show which parts and checks a run would rebuild, without running', 'run': 'Build changed parts, export, check and record a run',
+                    'verify': 'Re-check the saved native scenes without rebuilding (same as run --source scene)'}
+    for name, text in descriptions.items():
+        p = sub.add_parser(name, help=text)
+        p.add_argument('project', nargs='?', default='.', help='Project folder (default: current folder)')
+        p.add_argument('--backend', choices=['blender','houdini'], help='Limit to one application')
+        p.add_argument('--parts', nargs='*', default=[], help='Rebuild these part IDs (plus their dependents)')
+        p.add_argument('--full', action='store_true', help='Ignore reusable evidence and re-run every export and check')
+        p.add_argument('--source', choices=['auto','scene','code'], default='auto', help='Use the saved native scene, regenerate from code, or decide automatically')
+        p.add_argument('--timeout', type=int, default=900, help='Seconds per native operation')
+        p.add_argument('--blender', help='Blender executable (overrides GEOMETRYFORGE_BLENDER)')
+        p.add_argument('--houdini', help='Houdini executable (overrides GEOMETRYFORGE_HOUDINI)')
+    p = sub.add_parser('restore', help='Copy a safe point into a new working folder (current work is kept)')
+    p.add_argument('project', nargs='?', default='.', help='Project folder (default: current folder)'); p.add_argument('--run', help='Run ID (default: the safe point)')
+    p = sub.add_parser('adopt', help='Make a saved .blend/.hip file the working scene for a backend')
+    p.add_argument('project', help='Project folder'); p.add_argument('--backend', choices=['blender','houdini'], required=True, help='Application the file belongs to')
+    p.add_argument('--file', required=True, help='Saved native file to copy in')
+    p = sub.add_parser('viewer', help='Start the local browser viewer (http://127.0.0.1:8743)'); p.add_argument('--port', type=int, default=8743, help='Port to listen on')
+    p = sub.add_parser('session', help='Inspect or stop the managed Houdini session'); p.add_argument('action', choices=['status','stop'])
     args=parser.parse_args()
     try:
         from . import projects, engine

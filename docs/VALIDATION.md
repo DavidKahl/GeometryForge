@@ -1,36 +1,46 @@
-# Windows validation — 3 October 2026
+# Validation
 
-Verified with Python 3.12.13, Blender 5.2.1 LTS and Houdini 22.0.368 Apprentice. Houdini produced `.hipnc` files through its supported GUI/OBJ workflow. No physical print test or macOS/Linux native validation is claimed.
+What has actually been verified, on what, and when. Nothing here claims a physical print. Native validation has only been done on Windows.
 
-## Automated coverage
+## Environment
 
-Final result: **18 core/API/installer tests passed; 2 Chromium browser tests passed.**
+Windows, Python 3.12.13, Blender 5.2.1 LTS, Houdini 22.0.368 Apprentice (saves `.hipnc` through its supported GUI/OBJ workflow), Bambu Studio 2.8.2.
 
-- Core tests cover dependency closure, incremental artifact/check reuse, checker invalidation, corrupted outputs, source conflicts, manual continuation, source-preserving full verification, restoration, locking, snapshot integrity, failure/cancellation and independent backend freshness.
-- Installer tests verify both harness folders, repeat installation, preservation of existing instructions, and refusal to overwrite local skill modifications.
-- Viewer API tests cover registration/creation, rename/archive, safe-point context, artifact downloads, path boundaries, Host validation, same-origin writes and session tokens.
-- Playwright tests render actual assemblies in Chromium, switch projects/backends/runs, toggle parts, inspect dimensions, navigate safe points and display failed-run diagnostics. Screenshot: [viewer-windows.png](viewer-windows.png).
-- The canonical skill passes the skill-creator validator. Harness-specific discovery folders and packaged references are installed and checked; full end-to-end Claude conversations were not automated.
+## Automated tests (8 October 2026)
 
-## Native application evidence
+- **23 Python tests passed.** They cover dependency closure, incremental artifact and check reuse, checker invalidation, corrupted outputs, source conflicts, manual-scene continuation, source-preserving full verification, restoration, locking, snapshot integrity, failure and cancellation, independent backend freshness, the installer, the viewer API (registration, rename/archive, artifact boundaries, Host validation, same-origin writes, session tokens, inline/attachment downloads), and whole-model 3MF files (slot read-back, undeclared slots, Bambu packaging).
+- **The Bambu Studio test** drives the installed Bambu Studio and skips itself where it isn't installed, as on CI.
+- **6 Chromium browser tests passed.** They run on generated fixture projects with a stand-in native backend: projects, backends, part visibility, filtering and groups, isolation and print pose, run comparison (side by side, overlay, missing parts), filament colouring, whole-model downloads, the image and log viewer, and explicit downloads.
+- **CI** runs the Python tests on Windows and Linux, builds the package, checks that the bundled viewer matches its sources, and runs the browser tests.
+- **The canonical skill** passed the skill-creator validator on 3 October; since then it has had documentation additions only. Both harness installations are checked by the tests. End-to-end agent conversations are not automated.
 
-Both examples were built, saved and reopened in both applications. The organizer retains three Blender Boolean modifiers and 22 Houdini nodes. The rocket retains 22 Blender modifiers and 172 Houdini nodes. Mesh validity, STL/3MF readback, bed fit and measured functional checks passed, as did cross-backend geometry comparisons.
+## Native application evidence (3 October 2026)
 
-The native acceptance suite demonstrates:
+`tools/validate_native.py` built, saved and reopened the desk organizer and the multipart rocket fixture (`tools/fixtures/falcon9`) in both applications. The organizer kept 3 Blender Boolean modifiers and 22 Houdini nodes; the rocket 22 modifiers and 172 nodes. Mesh validity, STL/3MF read-back, bed fit, measured functional checks and cross-application comparisons passed. The suite demonstrated:
 
-1. A fairing-height change rebuilds only the fairing in each backend, refreshes its exports/preview and the upper-joint check, and reuses five parts plus three checks.
-2. A clearance change refreshes the two joint sides, stand and coupon while reusing the unrelated legs.
-3. Saved edits in both Blender and Houdini are detected and continued. Full verification invokes zero builders, preserves source hashes and retains the prior safe point while the other backend awaits reconciliation.
-4. Restoration creates separate working copies with matching procedural inputs; the edited files remain unchanged.
+1. A fairing-height change rebuilds only the fairing in each application, refreshes its exports, preview and the upper-joint check, and reuses five parts and three checks.
+2. A clearance change refreshes both joint sides, the stand and the coupon while reusing the unrelated legs.
+3. Saved manual edits in Blender and Houdini are detected and continued. Full verification invokes zero builders, preserves source hashes and keeps the prior safe point while the other application awaits reconciliation.
+4. Restoration creates separate working copies with matching procedural inputs; the edited files stay unchanged.
 
-Detailed evidence is in [native-evidence.json](native-evidence.json). Reproduce with `uv run python tools/validate_native.py --workspace validation-workspace` after configuring the installed native applications. This uses a disposable test workspace; do not point it at personal modeling projects.
+Details: [native-evidence.json](native-evidence.json). Reproduce with `uv run python tools/validate_native.py --workspace validation-workspace` once Blender and Houdini are configured. It uses a disposable workspace; never point it at your own projects.
 
-## Packaging
+Since then, the whole-model 3MF step and the filament slot parameter of the native API were added. Both were exercised natively by the Astraeus lander run below, but `validate_native.py` itself has not been rerun.
 
-Built a wheel and source distribution. Installed the wheel into a separate virtual environment and invoked it outside the source checkout. The installed package supplied its own example, installed the skill into both harnesses, built and verified a Blender organizer, and exposed the bundled viewer assets and license notice. See [package-evidence.json](package-evidence.json).
+## Showcase project (8 October 2026)
 
-The normal verification commands are `uv run pytest -q`, `npm run build --prefix ui`, and `npm run test --prefix ui` with the local viewer running and the native acceptance projects registered. Browser tests currently use those acceptance projects rather than generating native geometry during browser startup.
+The Astraeus Heavy Lander (22 parts) passed in both applications with the four-colour filament plan, and Bambu Studio packaged its print kit. See the project's [VALIDATION.md](../projects/astraeus_lander/VALIDATION.md) for checks, slicing estimates and what wasn't verified: Bambu Studio's command line can't slice the multi-filament X2D kit offline.
+
+## Packaging (3 October 2026)
+
+A wheel and source distribution were built, and the wheel installed into a separate environment and used outside the checkout. It supplied its own example, installed the skill for both harnesses, built and verified the organizer in Blender, and served the bundled viewer with its license notice. See [package-evidence.json](package-evidence.json). Package metadata changed for the public release; CI rebuilds the package on every push.
 
 ## Known limits
 
-Saved disk files are monitored; unsaved UI edits must be saved first. Native history reconciliation remains agent-authored work. Dependency declarations must include every relevant source, parameter and interface. Scene inspection can still evaluate the whole assembly. The viewer is local and single-user; model scripts are trusted local code, not sandboxed. The test client currently emits an upstream HTTPX deprecation warning; tests pass.
+- Only saved files are monitored; save native edits before continuing.
+- Reconciling Blender and Houdini history is agent-authored work.
+- Dependency declarations must include every relevant source, parameter and interface.
+- Scene inspection may still evaluate the whole assembly.
+- The viewer is local and single-user. Model scripts are trusted, unsandboxed local code.
+- macOS and Linux native operation is unverified.
+- The test client emits an upstream HTTPX deprecation warning; tests pass.

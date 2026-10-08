@@ -31,4 +31,8 @@ def doctor():
             result[name] = {"available": True, "executable": fn()}
         except (FileNotFoundError, ValueError) as exc:
             result[name] = {"available": False, "error": str(exc)}
+    # Optional: only used when a project sets decisions.print.bambu.
+    from .kit import bambu_executable
+    bambu = bambu_executable()
+    result["bambu_studio"] = {"available": True, "executable": str(bambu)} if bambu else {"available": False, "optional": True, "error": "Not found; set GEOMETRYFORGE_BAMBU to use Bambu Studio packaging"}
     return result

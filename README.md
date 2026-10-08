@@ -2,74 +2,137 @@
 
 **Model in your agent. Keep editable native files. Inspect every iteration.**
 
-GeometryForge gives Claude Code and Codex a shared skill for creating printable geometry and native Blender/Houdini projects. A small local toolkit keeps working files, snapshots, incremental checks and SAFE POINTS organized. The optional browser viewer shows projects, assemblies, runs and evidence. Your agent's existing harness handles the conversation and modeling; GeometryForge has no embedded AI provider or API-key setup.
+[![CI](https://github.com/DavidKahl/GeometryForge/actions/workflows/ci.yml/badge.svg)](https://github.com/DavidKahl/GeometryForge/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)
 
-## Install from this checkout
+GeometryForge lets a coding agent, [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) or [Codex](https://developers.openai.com/codex), build 3D-printable models as real, editable **Blender** and **Houdini** projects. You describe what you want in plain language. The agent writes the modeling code, and GeometryForge runs it in the native applications, checks the result, exports print files and keeps a history of every iteration that you can inspect in a local browser viewer.
 
-Requires Python 3.12 and at least one installed modeling application. Windows is the native verification platform; paths and core logic are portable, but macOS/Linux native operation is unverified.
+![The GeometryForge viewer showing the Astraeus Heavy Lander, its parts and its run history](docs/viewer-windows.png)
+
+## Watch the introduction
+
+The introduction video will be linked here.
+
+## What you get
+
+- **Editable native files, not just meshes.** Every part is built with Blender modifiers or Houdini nodes and saved as a `.blend` / `.hip` file you can open, tweak and hand back to the agent.
+- **Incremental runs.** Change one part and only that part and the checks that depend on it are rebuilt. Unchanged parts reuse their verified evidence.
+- **Safe points.** A run that passes every check in every requested application becomes a safe point. Failed or partial attempts never replace it, and you can always restore it.
+- **Print-ready output.** Each part is exported as STL and 3MF in its print orientation and checked for watertightness, volume, bed fit and an STL/3MF round trip. Projects add their own fit and interface checks.
+- **Multi-material 3MF.** Every run also writes the whole model as one 3MF: an assembled version for judging colours and a print kit with every part. With [Bambu Studio](https://bambulab.com/en/download/studio) installed, the kit becomes a ready-to-slice project with plates and filament colours.
+- **A local viewer.** Browse projects and runs, isolate parts, compare any two runs side by side or as an overlay, view renders and download files.
+- **No AI service of its own.** GeometryForge has no API keys, model provider or chat. Your existing agent does the thinking; GeometryForge does deterministic execution and bookkeeping.
+
+## Requirements
+
+| | Required | Notes |
+|---|---|---|
+| Python 3.12 and [uv](https://docs.astral.sh/uv/) | Yes | uv manages the environment |
+| An agent harness | Yes | Claude Code or Codex |
+| [Blender](https://www.blender.org/download/) | At least one of the two | Verified with 5.2.1 LTS |
+| [Houdini](https://www.sidefx.com/download/) | At least one of the two | Verified with 22.0 (Apprentice works, saves `.hipnc`) |
+| [Bambu Studio](https://bambulab.com/en/download/studio) | Optional | Verified with 2.8.2; arranges the multi-material print kit |
+| Node.js 22 | Only for development | End users get the prebuilt viewer |
+
+**Platform:** Windows is the verified platform. The code is portable and the automated tests also run on Linux, but native Blender/Houdini operation on macOS and Linux has not been verified yet.
+
+## Install
 
 ```powershell
-uv sync --frozen --extra viewer --extra dev
-uv run geometryforge install-skill --target E:/Models/MyWorkspace --harness both
+git clone https://github.com/DavidKahl/GeometryForge.git
+cd GeometryForge
+uv sync --frozen --extra viewer
 uv run geometryforge doctor
 ```
 
-For independent use from another environment, install the local checkout with `uv pip install "E:/Projects/GeometryForge[viewer]"`, or install the built wheel. Omit `[viewer]` for CLI-only use. The repository is not yet published to PyPI. The package includes the skill, examples and browser assets; end users do not need Node.
-
-`install-skill --user` makes the skill available across projects. Project installation writes `.agents/skills/geometryforge` and `.claude/skills/geometryforge`. Existing agent instruction files are preserved. Installation refuses to replace locally modified skill files. Restart your harness if the skill is not immediately visible.
-
-If discovery needs help, set environment variables to your local executables:
+`doctor` shows which Blender, Houdini and Bambu Studio executables were found. GeometryForge looks at environment variables first, then your `PATH`, then the standard Windows install folders. If something isn't found, point to it:
 
 ```powershell
 $env:GEOMETRYFORGE_BLENDER = 'C:/path/to/blender.exe'
-$env:GEOMETRYFORGE_HOUDINI = 'C:/path/to/Houdini/bin/houdini.exe'
+$env:GEOMETRYFORGE_HOUDINI = 'C:/Program Files/Side Effects Software/Houdini 22.0.368'
+$env:GEOMETRYFORGE_BAMBU   = 'C:/Program Files/Bambu Studio/bambu-studio.exe'   # optional
 ```
+
+To use GeometryForge from another Python environment, install the checkout as a package with `uv pip install "path/to/GeometryForge[viewer]"` (omit `[viewer]` for the command line only). It isn't on PyPI yet.
+
+### Install the skill for your agent
+
+The skill teaches your agent the workflow: establish the brief and printer, model each part natively, plan, run, read the evidence and report honestly.
+
+```powershell
+uv run geometryforge install-skill --target C:/Models/MyWorkspace   # one workspace
+uv run geometryforge install-skill --user                           # all your projects
+```
+
+This writes `.claude/skills/geometryforge` and `.agents/skills/geometryforge` (for Codex). Existing `CLAUDE.md`/`AGENTS.md` files are left alone, and locally modified skill files are never overwritten. Restart your agent if the skill doesn't show up.
 
 ## Your first project
 
 ```powershell
-uv run geometryforge init E:/Models/Organizer --example desk_organizer --deliverables both
-uv run geometryforge context E:/Models/Organizer
-uv run geometryforge plan E:/Models/Organizer
-uv run geometryforge run E:/Models/Organizer
+uv run geometryforge init C:/Models/Organizer --example desk_organizer --deliverables both
+uv run geometryforge plan C:/Models/Organizer
+uv run geometryforge run C:/Models/Organizer
 uv run geometryforge viewer
 ```
 
-Open `http://127.0.0.1:8743`. For Blender-only output choose `--deliverables blender`; `geometry` uses `--backend` internally while print files are the requested deliverables. Internal native snapshots remain available for safe continuation.
-
-Then ask your agent, for example:
+Open <http://127.0.0.1:8743> to see the result. Then start your agent in that folder and ask, for example:
 
 > Use GeometryForge to make this organizer 150 mm wide with four compartments. Keep both native projects editable, reuse unaffected checks, and show me the resulting run.
 
-For print work, the skill establishes the target printer/process and a part-level print plan before detailed modeling. Usable build space, nozzle/line settings, material, load direction, removable supports and calibrated fits guide the geometry. Printer changes trigger reassessment of affected parts. See [printer-aware modeling](geometryforge/skill/references/printing.md) for the workflow and the distinction between mesh checks, slicer review and physical testing.
+For a new model, just describe it, including the printer you'll use:
 
-## Edits, runs and safe points
+> Use GeometryForge to design a wall-mounted holder for two game controllers. I print on a Bambu X1C with a 0.4 mm nozzle in PLA. Blender only.
 
-- A **working file** is editable. Save changes in Blender/Houdini before asking the agent to inspect them.
-- A **run** retains selected inputs, native snapshots, print artifacts, actual measurements and reuse provenance. It may rebuild only one part.
-- A **SAFE POINT** has complete required validation, including reusable evidence whose inputs still match. After working edits it remains recoverable and is marked as predating those edits.
-- A **candidate** is retained work with incomplete coverage, uncertain scope, or another requested backend still needing reconciliation. Failed and cancelled attempts never replace a safe point.
+The agent asks only for decisions that change the design, writes the brief, dimensions and print plan into the project, and builds part by part. On Windows, double-click `Launch Viewer.cmd` in this repository to start the viewer.
 
-```powershell
-geometryforge run E:/Models/Rocket --parts fairing
-geometryforge adopt E:/Models/Rocket --backend blender --file E:/Models/edited.blend
-geometryforge run E:/Models/Rocket --backend blender --source scene
-geometryforge verify E:/Models/Rocket --backend blender --full
-geometryforge restore E:/Models/Rocket
+## Showcase: Astraeus Heavy Lander
+
+[`projects/astraeus_lander`](projects/astraeus_lander) is a 480 mm, 22-part display model of a fictional heavy lander, built entirely by an agent with GeometryForge from a single concept sheet. It has native Blender and Houdini versions, eight interface checks and a four-colour filament plan for a Bambu Lab X2D. See its [README](projects/astraeus_lander/README.md) and [print and assembly guide](projects/astraeus_lander/PRINT_AND_ASSEMBLE.md).
+
+The printable files (STL, 3MF, the Bambu print kit and the native scenes) are attached to the [GitHub release](https://github.com/DavidKahl/GeometryForge/releases), so you can print it without Blender or Houdini.
+
+## How it works
+
+```text
+you ──► agent (Claude Code / Codex) ──► project files: models/, checks/, parameters.json, decisions.json
+                                            │
+                    geometryforge plan/run  ▼
+        Blender / Houdini build the parts ──► checks ──► STL / 3MF / previews ──► run record
+                                                                                    │
+                                                         local viewer  ◄────────────┘
 ```
 
-Full verification loads edited scenes and reruns checks without regenerating pristine geometry. If both code/parameters and the native file changed, the agent must resolve which source to use. `--source code` explicitly authorizes selected builders to replace those parts in a scene copy. Restoration writes a separate working copy and matching procedural inputs, preserving current work.
+| Term | Meaning |
+|---|---|
+| **Project** | A folder with `project.toml` (parts, builders, checks and their dependencies), `parameters.json` (dimensions), `decisions.json` (brief, printer, filaments) and the modeling code in `models/` and `checks/`. |
+| **Run** | One execution. It snapshots its inputs, builds the selected parts, exports and checks them, and records everything under `.geometryforge/runs/<id>`. |
+| **Safe point** | The latest run that passed every required check in every requested application. |
+| **Candidate** | Kept work whose coverage is incomplete or whose scope was uncertain. It never replaces the safe point. |
+| **Working scene** | The editable `.blend`/`.hip` under `working/`. Save your manual edits there, then ask the agent to continue. GeometryForge detects the change. |
 
-Both backends are native implementations of shared design intent, not automatic translators of construction history. Manual edits may need agent-assisted reconciliation. Geometry inspection can evaluate the entire saved scene; incremental runs avoid unrelated builders, print exports, previews and functional checks.
+The [user guide](docs/GUIDE.md) covers the full workflow: editing native files by hand, restoring, the command reference, the project files, multi-material printing and troubleshooting.
 
-## Project layout
+## Limits, honestly
 
-`project.toml` declares parts, builders and check dependencies. `parameters.json` holds dimensions; `decisions.json` holds the brief, deliverables and print constraints. Modeling and check code live in `models/` and `checks/`. Editable copies live under `working/`; immutable-by-convention evidence lives under `.geometryforge/runs/`. Keep retained snapshots intact. Project registration is stored locally under `~/.geometryforge` (override with `GEOMETRYFORGE_HOME`).
+- Geometry checks don't replace slicing, a material-specific fit test or a physical print. Print the fit coupon first.
+- GeometryForge exports STL and 3MF. It never slices for you or sends anything to a printer.
+- Blender and Houdini versions are separate native implementations of the same design intent, compared by dimensions and volume. There's no automatic translation of construction history between them.
+- Project scripts are trusted local code and run unsandboxed in your applications. Only run projects you trust. See [SECURITY.md](SECURITY.md).
+- Houdini's own license terms (e.g. Apprentice: non-commercial, `.hipnc`) still apply to the files it produces.
 
-See the [skill](geometryforge/skill/SKILL.md), [project contract](geometryforge/skill/references/contracts.md), [architecture](docs/ARCHITECTURE.md), [validation evidence](docs/VALIDATION.md), and [contributing guide](CONTRIBUTING.md).
+## Documentation
 
-![Local viewer showing the rocket assembly and run evidence](docs/viewer-windows.png)
+- [User guide](docs/GUIDE.md): workflow, commands, project files, multi-material printing, troubleshooting
+- [Architecture](docs/ARCHITECTURE.md): how runs, evidence reuse, recovery and the viewer work
+- [Validation](docs/VALIDATION.md): what has actually been verified, on what
+- [The agent skill](geometryforge/skill/SKILL.md) and its [project contract](geometryforge/skill/references/contracts.md) and [printing guidance](geometryforge/skill/references/printing.md)
+- [Changelog](CHANGELOG.md)
 
-Geometry checks do not replace slicing, material-specific fit testing, or a physical print. This project provides STL/3MF, not G-code. Generated project scripts execute as trusted local code. Houdini retains its actual license restrictions and selects the appropriate native file extension.
+## Contributing
 
-MIT licensed. Original simplified rocket geometry is not affiliated with SpaceX. See [third-party notices](THIRD_PARTY_NOTICES.md).
+Bug reports, ideas and pull requests are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md). Report security issues privately as described in [SECURITY.md](SECURITY.md).
+
+## License
+
+[MIT](LICENSE) © 2026 David Kahl. Blender, Houdini and Bambu Studio are separate products under their own licenses and are not distributed here. See [third-party notices](THIRD_PARTY_NOTICES.md).
