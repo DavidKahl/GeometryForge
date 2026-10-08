@@ -1,0 +1,18 @@
+{
+  "brief": "230 x 230 x 55 mm office LED distribution hub wall enclosure, v2 reactor cover variant",
+  "intended_use": "3d printing",
+  "units": "mm",
+  "deliverables": "geometry",
+  "execution_backend": "blender",
+  "print": {
+    "bed_mm": [
+      256,
+      256
+    ],
+    "nozzle_mm": 0.4,
+    "minimum_wall_mm": 2.4
+  },
+  "unresolved": [
+    "Port legacy_source/models/hub.py to a GeometryForge backend entry before making new runs"
+  ]
+}
