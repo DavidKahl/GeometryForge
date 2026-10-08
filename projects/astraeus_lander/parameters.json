@@ -6,5 +6,11 @@
   "thermal_band_height_mm": 24,
   "tile_side_mm": 2.0,
   "fin_thickness_mm": 3.2,
-  "nose_tip_height_mm": 28
+  "nose_tip_height_mm": 28,
+  "filament_slots": {
+    "silver": 1,
+    "dark": 2,
+    "engine": 3,
+    "accent": 4
+  }
 }

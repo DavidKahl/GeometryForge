@@ -33,7 +33,7 @@ A change of printer, nozzle, material, layer/line settings, support policy or fi
 
 On manual file changes, follow [revisions](references/revisions.md). Continuing an edited native scene is allowed. Never regenerate pristine geometry merely to perform full checks. `geometryforge verify <project> --full` verifies the working scenes. Explain uncertain scope and offer fuller verification or investigation rather than silently launching expensive work.
 
-Deliver print artifacts, requested native files, measured check results, and the viewer/project reference. Include the target printer/process, orientations, support/assembly instructions and remaining assumptions. Distinguish fresh checks, reused evidence, candidates and SAFE POINTS, and separately state geometry verification, slicer review and physical testing. Renders show appearance; they do not establish fit, wall thickness or physical print success.
+Deliver print artifacts (per-part STL/3MF plus the run's whole-model `kit/` files and filament plan), requested native files, measured check results, and the viewer/project reference. Include the target printer/process, orientations, support/assembly instructions and remaining assumptions. Distinguish fresh checks, reused evidence, candidates and SAFE POINTS, and separately state geometry verification, slicer review and physical testing. Renders show appearance; they do not establish fit, wall thickness or physical print success.
 
 ## Both native backends
 

@@ -4,6 +4,32 @@ from pathlib import Path
 import re
 
 
+def print_pose(name, objects):
+    """Trimesh bodies of one part rotated to its print orientation, centred in X/Y and resting on Z=0."""
+    import numpy as np
+    import trimesh
+    rotations = {tuple(obj["print_rotation_deg"]) for obj in objects}
+    if len(rotations) != 1:
+        raise ValueError(f"{name}: bodies must share a print rotation")
+    rotation = trimesh.transformations.euler_matrix(*np.radians(next(iter(rotations))))
+    meshes = []
+    for obj in objects:
+        vertices = np.asarray(obj["vertices"], dtype=float)
+        faces = np.asarray(obj["faces"], dtype=int)
+        if (vertices.ndim != 2 or vertices.shape[1] != 3 or len(vertices) == 0
+                or faces.ndim != 2 or faces.shape[1] != 3 or len(faces) == 0
+                or not np.isfinite(vertices).all() or faces.min() < 0 or faces.max() >= len(vertices)):
+            raise ValueError(f"{name}: invalid or empty mesh arrays")
+        mesh = trimesh.Trimesh(vertices=vertices, faces=obj["faces"], process=True)
+        mesh.apply_transform(rotation)
+        meshes.append(mesh)
+    combined = trimesh.util.concatenate(meshes)
+    offset = [-combined.bounds[:, 0].mean(), -combined.bounds[:, 1].mean(), -combined.bounds[0, 2]]
+    for mesh in meshes:
+        mesh.apply_translation(offset)
+    return meshes
+
+
 def export(raw: Path, out: Path, constraints: dict) -> dict:
     import numpy as np
     import trimesh
@@ -23,28 +49,10 @@ def export(raw: Path, out: Path, constraints: dict) -> dict:
     report = {"units": "mm", "passed": True, "parts": []}
     ready = []
     for name, objects in grouped.items():
-        meshes = []
-        rotations = {tuple(obj["print_rotation_deg"]) for obj in objects}
-        if len(rotations) != 1:
-            raise ValueError(f"{name}: bodies must share a print rotation")
         expectations = {(tuple(obj.get('expected_bbox_mm', [])), obj.get('expected_bodies', 1)) for obj in objects}
         if len(expectations) != 1:
             raise ValueError(f"{name}: bodies must share part-level dimension and body-count expectations")
-        rotation = trimesh.transformations.euler_matrix(*np.radians(next(iter(rotations))))
-        for obj in objects:
-            vertices = np.asarray(obj["vertices"], dtype=float)
-            faces = np.asarray(obj["faces"], dtype=int)
-            if (vertices.ndim != 2 or vertices.shape[1] != 3 or len(vertices) == 0
-                    or faces.ndim != 2 or faces.shape[1] != 3 or len(faces) == 0
-                    or not np.isfinite(vertices).all() or faces.min() < 0 or faces.max() >= len(vertices)):
-                raise ValueError(f"{name}: invalid or empty mesh arrays")
-            mesh = trimesh.Trimesh(vertices=vertices, faces=obj["faces"], process=True)
-            mesh.apply_transform(rotation)
-            meshes.append(mesh)
-        combined = trimesh.util.concatenate(meshes)
-        offset = [-combined.bounds[:, 0].mean(), -combined.bounds[:, 1].mean(), -combined.bounds[0, 2]]
-        for mesh in meshes:
-            mesh.apply_translation(offset)
+        meshes = print_pose(name, objects)
         combined = trimesh.util.concatenate(meshes)
         expected = objects[0].get("expected_bbox_mm", [])
         bed = constraints.get("bed_mm", [256, 256])

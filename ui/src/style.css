@@ -186,6 +186,15 @@ a.file:hover{border-color:var(--accent)}
 pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;color:#efb49f;max-height:160px;overflow:auto;margin:12px 0 0}
 pre:empty{display:none}
 
+/* Full-model files and filament legend */
+.kit-files{display:flex;flex-direction:column;gap:6px}
+.kit-file{display:flex;align-items:center;gap:10px;font-size:12px;flex-wrap:wrap}
+.filaments{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+button.filament{font-size:12px;padding:4px 10px 4px 6px;border-radius:999px}
+button.filament b{font-size:11px;color:var(--muted)}
+.swatch{width:14px;height:14px;border-radius:50%;border:1px solid #ffffff40;flex:none}
+.note{font-size:11.5px;margin:10px 0 0}
+
 /* Dialogs */
 dialog{border:1px solid #3f5a6c;border-radius:12px;background:#152231;color:var(--text);max-width:520px;width:90%;padding:26px}
 dialog::backdrop{background:#000a}

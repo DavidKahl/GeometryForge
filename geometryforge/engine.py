@@ -255,6 +255,14 @@ def execute_backend(p, data, out, frozen, backend, spec, full, timeout, executab
         info["checks"][name] = {**check_result, "key": key, "reused": False}
         if code or not check_result["passed"]:
             raise ValueError(f"{backend}: check {name} failed: {check_result}")
+    # Whole-model files are rebuilt every run from the evaluated scene: cheap, and they always match it.
+    from .kit import write_kits, bambu_package
+    kit_dir = directory / "kit"
+    constraints = data["decisions"].get("print", {})
+    kit = write_kits(grouped, kit_dir, constraints)
+    kit["bambu"] = bambu_package(kit_dir, constraints, kit["parts"], timeout)
+    kit["artifacts"] = [artifact(p, kit_dir / f) for f in ("kit.3mf", "assembled-bambu.3mf", "assembled.3mf", "kit-raw.3mf") if (kit_dir / f).is_file()]
+    info["kit"] = kit
     # Make a new editable file, never replace a user-edited scene.
     working = p["root"] / "working" / data["id"] / backend / native_path.name
     working.parent.mkdir(parents=True, exist_ok=True)

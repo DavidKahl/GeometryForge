@@ -37,7 +37,7 @@ class Blender:
     def rotate(self, obj, degrees):
         obj.rotation_euler = [math.radians(x) for x in degrees]
 
-    def finish(self, obj, bodies=1, rotation=(0,0,0)):
+    def finish(self, obj, bodies=1, rotation=(0,0,0), filament=1):
         import bpy
         from .blender_scene import printable
         for c in list(obj.users_collection):
@@ -45,7 +45,7 @@ class Blender:
         bpy.data.collections['Printable'].objects.link(obj)
         obj.hide_render = False
         obj.hide_set(False)
-        printable(obj, part=self.part, rotation=rotation)
+        printable(obj, part=self.part, rotation=rotation, filament=filament)
         obj['gf_expected_bodies'] = bodies
         obj.color = (0.32,0.65,0.61,1)
         return obj
@@ -82,8 +82,8 @@ class Houdini:
     def rotate(self, obj, degrees):
         obj.transform.parmTuple('r').set(degrees)
 
-    def finish(self, obj, bodies=1, rotation=(0,0,0)):
+    def finish(self, obj, bodies=1, rotation=(0,0,0), filament=1):
         from .houdini_scene import finish, material
-        finish(obj, material('GeometryForge',(.32,.65,.61)), rotation=rotation, part=self.part, bodies=bodies)
+        finish(obj, material('GeometryForge',(.32,.65,.61)), rotation=rotation, part=self.part, filament=filament, bodies=bodies)
         obj.geo.layoutChildren()
         return obj

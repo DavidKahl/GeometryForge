@@ -1,28 +1,65 @@
 {
-    "brief":  "Reconstruct the user-supplied Astraeus Heavy Lander concept as a detailed multipart printable display model",
-    "intended_use":  "480 mm display model from user-supplied concept, multipart FDM",
-    "units":  "mm",
-    "deliverables":  "both",
-    "execution_backend":  "blender",
-    "print":  {
-                  "bed_mm":  [
-                                 256,
-                                 256,
-                                 250
-                             ],
-                  "nozzle_mm":  0.4,
-                  "printer":  "Bambu X2D (user specified)",
-                  "height_limit_note":  "250 mm conservative validation limit; only XY bed was specified by user"
-              },
-    "unresolved":  [
-
-                   ],
-    "reference":  "User-provided Astraeus Heavy Lander concept sheet, 3 October 2026",
-    "assumptions":  [
-                        "1:150 nominal scale; 480 mm total height",
-                        "Confirmed by user: 480 mm model, 0.4 mm FDM nozzle, 256 mm bed, Bambu X2D. Suggested 0.12-0.16 mm layers.",
-                        "Silhouette takes precedence over inconsistent upper-canard span annotation",
-                        "Deployed legs are static; fins/canards separate; glue optional after test fitting",
-                        "Surface details enlarged where needed for printing"
-                    ]
+  "brief": "Reconstruct the user-supplied Astraeus Heavy Lander concept as a detailed multipart printable display model",
+  "intended_use": "480 mm display model from user-supplied concept, multipart FDM",
+  "units": "mm",
+  "deliverables": "both",
+  "execution_backend": "blender",
+  "print": {
+    "bed_mm": [
+      256,
+      256,
+      250
+    ],
+    "nozzle_mm": 0.4,
+    "printer": "Bambu X2D (user specified)",
+    "height_limit_note": "250 mm conservative validation limit; only XY bed was specified by user",
+    "filaments": [
+      {
+        "slot": 1,
+        "name": "Silver",
+        "colour": "#BFCAD1",
+        "material": "PLA",
+        "preset": "Generic PLA @BBL X2D 0.4 nozzle",
+        "used_for": "hull segments, cargo, nose"
+      },
+      {
+        "slot": 2,
+        "name": "Dark",
+        "colour": "#2C3842",
+        "material": "PLA",
+        "preset": "Generic PLA @BBL X2D 0.4 nozzle",
+        "used_for": "fins, canards, nose tip, thermal band"
+      },
+      {
+        "slot": 3,
+        "name": "Engine",
+        "colour": "#616F79",
+        "material": "PLA",
+        "preset": "Generic PLA @BBL X2D 0.4 nozzle",
+        "used_for": "engines, engine mount, legs"
+      },
+      {
+        "slot": 4,
+        "name": "Accent",
+        "colour": "#A68959",
+        "material": "PLA",
+        "preset": "Generic PLA @BBL X2D 0.4 nozzle",
+        "used_for": "fit coupon"
+      }
+    ],
+    "bambu": {
+      "machine": "Bambu Lab X2D 0.4 nozzle",
+      "process": "0.16mm High Quality @BBL X2D"
+    }
+  },
+  "unresolved": [],
+  "reference": "User-provided Astraeus Heavy Lander concept sheet, 3 October 2026",
+  "assumptions": [
+    "1:150 nominal scale; 480 mm total height",
+    "Confirmed by user: 480 mm model, 0.4 mm FDM nozzle, 256 mm bed, Bambu X2D. Suggested 0.12-0.16 mm layers.",
+    "Silhouette takes precedence over inconsistent upper-canard span annotation",
+    "Deployed legs are static; fins/canards separate; glue optional after test fitting",
+    "Surface details enlarged where needed for printing",
+    "Filament presets are Generic PLA placeholders in the model colours; actual spools/presets are chosen in Bambu Studio."
+  ]
 }

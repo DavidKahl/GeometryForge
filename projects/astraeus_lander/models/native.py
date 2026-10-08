@@ -79,7 +79,8 @@ class Shapes:
     def union(self,obj,tool):return self.api.boolean(obj,tool,'UNION')
     def cut(self,obj,tool):return self.api.boolean(obj,tool,'DIFFERENCE')
     def finish(self,obj,color='silver',rotation=(0,0,0),bodies=1):
-        self.api.finish(obj,bodies=bodies,rotation=rotation)
+        # The colour picks the filament slot (parameters.json filament_slots), so the 3MFs open in the model colours.
+        self.api.finish(obj,bodies=bodies,rotation=rotation,filament=self.p.get('filament_slots',{}).get(color,1))
         colors={'silver':(.52,.59,.64),'dark':(.025,.039,.055),'engine':(.12,.16,.19),'piston':(.7,.73,.76),'accent':(.38,.25,.10)}
         rgb=colors[color]
         if self.blender:

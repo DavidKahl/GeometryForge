@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import './style.css';
-import {api,artifactURL,clearCache,el,fileName,find,loadParts,natural,runTime,session,shortId,startSession,type Context,type Loaded,type Project,type Run} from './api';
+import {api,artifactURL,clearCache,el,fileName,find,loadParts,natural,runTime,session,shortId,startSession,type Context,type Filament,type Kit,type Loaded,type Project,type Run} from './api';
 import {addGround,makePane,Viewer,type Pane} from './scene';
 import {baseName,renderParts,type Diff,type PartsState,type Row} from './parts';
 import {renderRuns} from './runs';
@@ -14,6 +14,7 @@ document.querySelector('#app')!.innerHTML=`
 <div class="workspace">
 <section class="canvas-panel">
 <div class="toolbar"><div id="run-chip" class="run-chip"></div><button id="safe" class="small ghost" title="Open the safe point run">↺ Safe point</button><nav id="crumbs" class="crumbs" aria-label="View"></nav><span class="spacer"></span>
+<div id="colour-mode" class="segmented" hidden title="Colour by part or by planned filament"><button data-colour="part" class="active">Part colours</button><button data-colour="filament">Filaments</button></div>
 <div id="pose" class="segmented" hidden><button data-pose="assembly" class="active">Assembly pose</button><button data-pose="print">Print pose</button></div>
 <div id="compare-mode" class="segmented" hidden><button data-mode="split" class="active">Side by side</button><button data-mode="overlay">Overlay</button></div>
 <select id="backend" aria-label="Backend"><option>blender</option><option>houdini</option></select><button id="fit" class="small" title="Fit view (F)">Fit</button></div>
@@ -36,7 +37,7 @@ const $=(id:string)=>document.getElementById(id)!;
 const viewer=new Viewer($('viewport'));
 let projects:Record<string,Project>={},runs:Run[]=[],ctx:Context|undefined,revision=0;
 let runA:Run|undefined,runB:Run|undefined,loadedA=new Map<string,Loaded>(),loadedB:Map<string,Loaded>|undefined;
-let pose:'assembly'|'print'='assembly',mode:'split'|'overlay'='split',hovered:string|undefined,assemblyCamera:ReturnType<Viewer['saveCamera']>|undefined;
+let colourMode:'part'|'filament'='part',pose:'assembly'|'print'='assembly',mode:'split'|'overlay'='split',hovered:string|undefined,assemblyCamera:ReturnType<Viewer['saveCamera']>|undefined;
 const state:PartsState={selection:new Set(),hidden:new Set(),filter:'',collapsed:new Set(),isolated:null};
 const backendName=()=>($('backend') as HTMLSelectElement).value;
 const sha=(l:Loaded|undefined)=>find(l?.part,'/assembly.json')?.sha256;
@@ -48,9 +49,15 @@ function guarded(fn:()=>Promise<unknown>){return ()=>void fn().catch(e=>toast(St
 function partColor(name:string){let h=0;for(const c of baseName(name))h=(h*31+c.charCodeAt(0))>>>0;return new THREE.Color().setHSL(.43+(h%5)*.055,.32,.62)}
 const ghostMaterial=()=>new THREE.MeshStandardMaterial({color:0xff9a4d,transparent:true,opacity:.32,depthWrite:false,roughness:.8,emissive:0x5a2400});
 
-function partObject(l:Loaded,ghost=false){
+// Filament colours come from the run's own plan (decisions.print.filaments), so old runs keep their colours.
+const SLOT_FALLBACK=['#cfd8dc','#37474f','#ff8a65','#4fc3f7','#aed581','#ba68c8','#ffd54f','#e57373'];
+const filamentPlan=(run?:Run)=>run?.decisions?.print?.filaments??[];
+function filamentColour(run:Run|undefined,slot:number){return new THREE.Color(filamentPlan(run).find(f=>f.slot===slot)?.colour??SLOT_FALLBACK[(slot-1)%SLOT_FALLBACK.length])}
+
+function partObject(l:Loaded,ghost=false,run?:Run){
   const holder=new THREE.Group(),body=new THREE.Group();holder.userData.part=l.name;holder.add(body);
-  for(const geometry of l.geometries){const mesh=new THREE.Mesh(geometry,ghost?ghostMaterial():new THREE.MeshStandardMaterial({color:partColor(l.name),roughness:.55,metalness:.05}));
+  for(const [i,geometry] of l.geometries.entries()){const colour=colourMode==='filament'?filamentColour(run,l.filaments[i]):partColor(l.name);
+    const mesh=new THREE.Mesh(geometry,ghost?ghostMaterial():new THREE.MeshStandardMaterial({color:colour,roughness:.55,metalness:.05}));
     mesh.userData.part=ghost?undefined:l.name;mesh.userData.ghost=ghost;body.add(mesh)}
   // Print pose matches the exporter: static XYZ Euler (trimesh 'sxyz'), centered in X/Y, resting on Z=0.
   if(pose==='print'&&state.isolated){const [x,y,z]=l.rotation.map(THREE.MathUtils.degToRad);body.rotation.set(x,y,z,'ZYX')}
@@ -60,9 +67,9 @@ function partObject(l:Loaded,ghost=false){
 function rebuild(refit:boolean){
   const names=state.isolated??[...loadedA.keys()];const split=!!runB&&mode==='split';
   const a=makePane(),b=split?makePane():undefined,panes=b?[a,b]:[a];
-  const place=(pane:Pane,loaded:Map<string,Loaded>|undefined,ghost=false)=>{const out=new Map<string,THREE.Group>();
-    for(const n of names){const l=loaded?.get(n);if(l){const o=partObject(l,ghost);pane.root.add(o);out.set(n,o)}}return out};
-  const objsA=place(a,loadedA),objsB=b?place(b,loadedB):runB&&mode==='overlay'?place(a,loadedB,true):new Map<string,THREE.Group>();
+  const place=(pane:Pane,loaded:Map<string,Loaded>|undefined,run:Run|undefined,ghost=false)=>{const out=new Map<string,THREE.Group>();
+    for(const n of names){const l=loaded?.get(n);if(l){const o=partObject(l,ghost,run);pane.root.add(o);out.set(n,o)}}return out};
+  const objsA=place(a,loadedA,runA),objsB=b?place(b,loadedB,runB):runB&&mode==='overlay'?place(a,loadedB,runB,true):new Map<string,THREE.Group>();
   if(state.isolated){
     // A fresh scene for the selection: recentre so each part is inspected on its own ground, not at its assembly position.
     const boxOf=(o?:THREE.Object3D)=>o?new THREE.Box3().setFromObject(o,pose==='print'):new THREE.Box3();
@@ -146,6 +153,8 @@ function renderToolbar(){
     el('strong',{textContent:iso.length===1?iso[0]:groupLabel(iso),title:iso.join(', ')}))}
   else crumbs.append(el('strong',{textContent:'Assembly'}));
   $('pose').hidden=!state.isolated;$('compare-mode').hidden=!runB;
+  $('colour-mode').hidden=!filamentPlan(runA).length&&![...loadedA.values()].some(l=>l.filaments.some(f=>f!==1));
+  $('colour-mode').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.colour===colourMode));
   $('pose').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.pose===pose));
   $('compare-mode').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
 }
@@ -201,6 +210,7 @@ function renderEvidence(){
   const log=`.geometryforge/runs/${runA.id}/${b}/${b}.log`;
   const scene=el('div',{class:'files'});if(backend.native)scene.append(downloadLink(backend.native.path,`⤓ Editable native scene (${fileName(backend.native.path)})`));
   scene.append(button('View backend log',()=>openLightbox([{path:log,title:`${b}.log`,subtitle:runLabel(runA!),kind:'text'}]),'small'));
+  renderKit(host,backend.kit);
   host.append(el('h3',{textContent:'Scene & logs'}),scene);
   const filter=state.isolated??(state.selection.size?[...state.selection]:null);
   const parts=[...loadedA.values()].filter(l=>!filter||filter.includes(l.name));
@@ -209,6 +219,25 @@ function renderEvidence(){
     el('tbody',{},...parts.map(l=>{const png=find(l.part,'preview.png');const view=png?button('View',()=>openLightbox([{path:png.path,title:l.name,subtitle:runLabel(runA!),kind:'image'}]),'small ghost'):'—';
       return el('tr',{},el('td',{textContent:l.name}),el('td',{},...l.part.artifacts.filter(x=>/\.(stl|3mf)$/.test(x.path)).map(x=>downloadLink(x.path,'⤓ '+fileName(x.path).split('.').pop()!.toUpperCase()))),el('td',{},view))})));
   host.append(el('h3',{textContent:'Print files'}),table);
+}
+
+// Whole-model deliverables: the Bambu project with plates, the assembled model, and the slicer-neutral files.
+function renderKit(host:HTMLElement,kit:Kit|undefined){
+  if(!kit)return;const files=new Map(kit.artifacts.map(a=>[fileName(a.path),a.path]));const bambu=kit.bambu?.files;
+  const plates=bambu?.['kit.3mf']?.plates??0;
+  const rows:[string,string][]=[['kit.3mf',`Bambu Studio project · ${plates} plate${plates===1?'':'s'} · every part in print orientation`],
+    ['assembled-bambu.3mf','Assembled model with filament colours, for planning (larger than the bed)'],
+    ['assembled.3mf','Assembled model, slicer-neutral'],['kit-raw.3mf','All parts in print orientation, slicer-neutral, not arranged']];
+  const list=el('div',{class:'kit-files'},...rows.filter(([f])=>files.has(f)).map(([f,label])=>el('div',{class:'kit-file'},downloadLink(files.get(f)!,'⤓ '+f),el('span',{class:'muted',textContent:label}))));
+  const slots=new Map<number,string[]>();for(const [part,used] of Object.entries(kit.parts))for(const s of used)slots.set(s,[...(slots.get(s)??[]),part]);
+  const plan=Object.values(kit.filaments) as Filament[];
+  const legend=el('div',{class:'filaments'},...[...slots.keys()].sort((a,b)=>a-b).map(s=>{const f=plan.find(x=>x.slot===s);const parts=slots.get(s)!.sort(natural);
+    const chip=button('',()=>{select(parts,'replace');showTab('parts')},'filament');chip.title=`Select the ${parts.length} parts printed in slot ${s}:\n${parts.join(', ')}`;
+    const swatch=el('span',{class:'swatch'});swatch.style.background='#'+filamentColour(runA,s).getHexString(THREE.SRGBColorSpace);
+    chip.append(swatch,el('b',{textContent:String(s)}),el('span',{textContent:`${f?.name??'Slot '+s}${f?.material?' · '+f.material:''}`}),el('small',{class:'muted',textContent:`${parts.length} part${parts.length===1?'':'s'}`}));return chip}));
+  host.append(el('h3',{textContent:'Full model'}),list,legend);
+  if(kit.bambu?.skipped)host.append(el('p',{class:'muted note',textContent:kit.bambu.skipped}));
+  else if(kit.bambu?.machine)host.append(el('p',{class:'muted note',textContent:`Arranged by Bambu Studio for ${kit.bambu.machine} · ${kit.bambu.process}. Not sliced; check plates and supports in the slicer.`}));
 }
 
 // ---------- Selection, visibility, isolation ----------
@@ -251,6 +280,7 @@ $('tab-parts').onclick=()=>showTab('parts');$('tab-runs').onclick=()=>showTab('r
 $('part-filter').oninput=()=>{state.filter=($('part-filter') as HTMLInputElement).value;renderPartsPanel()};
 $('show-all').onclick=()=>setHidden([...loadedA.keys()],false);$('show-none').onclick=()=>setHidden([...loadedA.keys()],true);
 $('show-invert').onclick=()=>{const all=[...loadedA.keys()];const shown=all.filter(n=>!state.hidden.has(n));state.hidden=new Set(shown);applyState();updateDimensions();renderPartsPanel()};
+$('colour-mode').querySelectorAll('button').forEach(b=>(b as HTMLButtonElement).onclick=()=>{colourMode=(b as HTMLButtonElement).dataset.colour as typeof colourMode;rebuild(false);renderToolbar()});
 $('pose').querySelectorAll('button').forEach(b=>(b as HTMLButtonElement).onclick=()=>{pose=(b as HTMLButtonElement).dataset.pose as typeof pose;rebuild(true);renderToolbar()});
 $('compare-mode').querySelectorAll('button').forEach(b=>(b as HTMLButtonElement).onclick=()=>{mode=(b as HTMLButtonElement).dataset.mode as typeof mode;rebuild(false);renderToolbar()});
 $('backend').onchange=guarded(()=>loadView());$('fit').onclick=()=>viewer.fit();
