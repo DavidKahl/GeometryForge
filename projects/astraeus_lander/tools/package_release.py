@@ -24,6 +24,10 @@ for backend,info in manifest['backends'].items():
                 copy(source,'prints/'+source.suffix[1:].upper()+'/'+source.name)
             elif '/checks/' in art['path']:
                 copy(source,f'evidence/{backend}/{name}/{source.name}')
+    # Whole-model 3MFs: the Bambu print kit and assembled models (the Blender run's copy is the release copy).
+    for art in info.get('kit',{}).get('artifacts',[]) if backend=='blender' else []:
+        source=root/art['path'];assert sha(source)==art['sha256']
+        copy(source,'prints/kit/'+source.name)
     for name,check in info['checks'].items():
         (release/'evidence'/backend).mkdir(parents=True,exist_ok=True)
         (release/'evidence'/backend/(name+'.json')).write_text(json.dumps(check,indent=2),encoding='utf-8')
@@ -41,9 +45,16 @@ for folder in ('models','checks','tools','references'):
 provenance=read(root/'review/render-provenance.json')
 assert provenance['sha256']==manifest['backends']['blender']['native']['sha256'],'Render belongs to another native revision'
 for image in (root/'review').glob('astraeus_*.png'):copy(image,'previews/'+image.name)
-copy(root/'review/render-provenance.json','evidence/render-provenance.json')
+def public(source,relative):
+    # Evidence written on the build machine carries absolute paths; publish them relative to the project instead.
+    text=source.read_text(encoding='utf-8')
+    for path,label in ((root,'<project>'),(Path.home(),'~')):
+        for form in (str(path),path.as_posix()):
+            text=text.replace(json.dumps(form)[1:-1],label).replace(form,label)
+    target=release/relative;target.parent.mkdir(parents=True,exist_ok=True);target.write_text(text,encoding='utf-8')
+public(root/'review/render-provenance.json','evidence/render-provenance.json')
 for summary in (root/'review').glob('slicing_*/summary.json'):
-    copy(summary,'evidence/'+summary.parent.name+'.json')
+    public(summary,'evidence/'+summary.parent.name+'.json')
 inventory={'run':ident,'height_mm':480,'nominal_scale':'1:150','printer':'Bambu X2D, 0.4 mm nozzle, 256 mm bed',
            'physical_model_pieces':27,'coupon_pieces':2,'stl_files':len(list((release/'prints/STL').glob('*.stl'))),
            'native_structure':{b:v['native_structure'] for b,v in manifest['backends'].items()},
@@ -52,10 +63,11 @@ inventory={'run':ident,'height_mm':480,'nominal_scale':'1:150','printer':'Bambu 
 (release/'inventory.json').write_text(json.dumps(inventory,indent=2),encoding='utf-8')
 (release/'README.md').write_text('''# Astraeus Heavy Lander — 480 mm
 
-27 model pieces and two fit-coupon rings for a 0.4 mm FDM nozzle and 256 mm bed.
+27 model pieces and two fit-coupon rings, designed for a Bambu Lab X2D (0.4 mm nozzle, 256 mm bed).
 
 - Start with [print and assembly instructions](PRINT_AND_ASSEMBLE.md).
-- `prints/STL/` and `prints/3MF/` contain the same printable geometry in alternative formats.
+- `prints/kit/kit.3mf` is a Bambu Studio project with every part on plates and the four planned filament colours; `assembled-bambu.3mf` shows the whole model in those colours. `kit-raw.3mf` and `assembled.3mf` are the same without Bambu settings.
+- `prints/STL/` and `prints/3MF/` contain the same printable geometry per part in alternative formats.
 - `native/` contains editable Blender and Houdini Apprentice scenes.
 - `previews/` contains renders of the actual model and an exploded assembly.
 - [Validation](VALIDATION.md) records mesh, fit, native-backend and local X2D slicing checks.

@@ -1,25 +1,36 @@
-# Astraeus Heavy Lander — 480 mm display model
+# Astraeus Heavy Lander: 480 mm display model
 
-Designed for your stated **Bambu X2D, 0.4 mm nozzle, 256 mm bed**. Nominal scale is 1:150. Hull diameter is 56.67 mm; assembled height is 480 mm. This is a detailed printable interpretation of your concept image.
+Designed for a **Bambu Lab X2D with a 0.4 mm nozzle and a 256 mm bed**. Nominal scale is 1:150: the hull is 56.67 mm across and the assembled model is 480 mm tall. The model is a printable interpretation of the [concept sheet](references/astraeus-concept-sheet.png).
 
-## Files and colors
+## Files
 
-The release contains 27 model pieces plus two fit-coupon rings. STL files use millimeters. Each part's 3MF retains its intended print orientation; it is a geometry file, not a preapproved printer job. Use either the STL set or the 3MF set, not both.
+The print package (from the [GitHub release](https://github.com/DavidKahl/GeometryForge/releases)) contains 27 model pieces plus two fit-coupon rings, in millimetres:
 
-| Pieces | Quantity | Suggested finish | Print position |
+| Folder | Use it when |
+|---|---|
+| `prints/kit/kit.3mf` | You print in Bambu Studio. Every part is on plates, in print orientation, with the four planned filament colours. Open it, choose your real filaments and check the plates. |
+| `prints/kit/assembled-bambu.3mf` | You want to see or change the colour scheme on the whole model. Too large to print as one piece. |
+| `prints/kit/kit-raw.3mf`, `assembled.3mf` | Same as above, without Bambu settings, for other slicers |
+| `prints/3MF/`, `prints/STL/` | You want individual parts. Each 3MF keeps the part's print orientation and filament; use either the STL or the 3MF set, not both. |
+
+None of these is a preapproved printer job.
+
+## Parts and colours
+
+| Pieces | Qty | Filament slot | Print position |
 |---|---:|---|---|
-| `aft_hull`, `tank_lower`, `tank_upper`, `cargo` | 4 | Silver / metallic gray | Upright, open end on plate |
-| `nose` | 1 | Silver / metallic gray | Broad end down |
-| `nose_tip` | 1 | Black | Socket end down |
-| `thermal_band` | 1 | Black / dark gray | Upright sleeve |
-| `aft_fin_1`–`aft_fin_4` | 4 | Dark gray | Flat back down; relief up |
-| `canard_1`–`canard_4` | 4 | Dark gray | Flat back down; relief up |
-| `leg_1`–`leg_4` | 4 | Dark gray, optional silver piston paint | Sideways as exported; supports needed |
-| `engine_mount` | 1 | Dark gray | Broad circular face down; support socket ceilings if needed |
-| `engines_1`–`engines_7` | 7 | Dark metallic gray | Bell opening down |
-| `coupon_1`, `coupon_2` | 2 | Any intended hull filament | Upright rings |
+| `aft_hull`, `tank_lower`, `tank_upper`, `cargo` | 4 | 1 Silver | Upright, open end on plate |
+| `nose` | 1 | 1 Silver | Broad end down |
+| `nose_tip` | 1 | 2 Dark | Socket end down |
+| `thermal_band` | 1 | 2 Dark | Upright sleeve |
+| `aft_fin_1`–`aft_fin_4` | 4 | 2 Dark | Flat back down; relief up |
+| `canard_1`–`canard_4` | 4 | 2 Dark | Flat back down; relief up |
+| `leg_1`–`leg_4` | 4 | 3 Engine grey (optional silver piston paint) | Sideways as exported; supports needed |
+| `engine_mount` | 1 | 3 Engine grey | Broad circular face down; support socket ceilings if needed |
+| `engines_1`–`engines_7` | 7 | 3 Engine grey | Bell opening down |
+| `coupon_1`, `coupon_2` | 2 | 4 Accent (or your hull filament) | Upright rings |
 
-Numbered duplicate fins/canards/legs are separate positions in the assembly. Print one of every delivered filename. The seven bell STLs are positioned as a cluster in their shared coordinate system; auto-arrange them as separate objects if importing the STLs. The engine 3MF already contains all seven bells. The coupon 3MF contains both rings.
+Numbered fins, canards and legs are separate positions in the assembly; print one of each. The seven engine bells share one coordinate system in the STL set, so auto-arrange them if you import the STLs. The engine 3MF already contains all seven, and the coupon 3MF both rings.
 
 ## Slicing and first print
 
@@ -31,7 +42,7 @@ Numbered duplicate fins/canards/legs are separate positions in the assembly. Pri
 6. Fins and canards have a flat back and relief on their upper print face. Legs retain wider feet and projecting piston detail: enable supports **from the build plate** for their undersides and inspect the support preview. Their actual layer orientation is sideways, not standing on the deployed foot.
 7. Use a brim for small engine-bell rims and tall narrow shells if your bed adhesion needs it. Check the first layers of the bells and sleeve in the slicer. Use support under the bulkhead's blind socket ceilings if bridging that diameter is unreliable with your material.
 
-The local slicing evidence uses Generic PLA and a textured PEI plate as stated assumptions. It does not know the filament currently loaded in your printer. Review your own settings before printing. No print is started by the project tools.
+The local slicing evidence uses Generic PLA and a textured PEI plate as stated assumptions. It doesn't know the filament loaded in your printer. Review your own settings before printing. No print is started by the project tools.
 
 ## Assembly order
 

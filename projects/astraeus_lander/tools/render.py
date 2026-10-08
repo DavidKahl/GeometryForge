@@ -3,7 +3,7 @@ import bpy,sys,math,json,hashlib
 from pathlib import Path
 from mathutils import Vector
 
-out=Path(sys.argv[sys.argv.index('--')+1]);out.mkdir(parents=True,exist_ok=True)
+out=Path(sys.argv[sys.argv.index('--')+1]).resolve();out.mkdir(parents=True,exist_ok=True)
 native=Path(bpy.data.filepath)
 (out/'render-provenance.json').write_text(json.dumps({'native_file':str(native),'sha256':hashlib.sha256(native.read_bytes()).hexdigest()},indent=2))
 scene=bpy.context.scene
