@@ -23,14 +23,18 @@ def main():
     def success(result):
         assert result['status']=='passed',result['failures']
         return result
+    # The rocket is a multipart regression fixture only; it is not a shipped example or a viewer project.
+    fixtures={'desk_organizer':projects.PACKAGE/'examples'/'desk_organizer','falcon9':Path(__file__).resolve().parent/'fixtures'/'falcon9'}
     for name,example in [('organizer','desk_organizer'),('rocket','falcon9')]:
-        root=workspace/name
-        if not root.exists():projects.initialize(root,example,ident=name)
+        root=workspace/name;source=fixtures[example]
+        if not root.exists():
+            projects.initialize(root,example if example=='desk_organizer' else None,ident=name)
+            if example=='falcon9':projects.unregister(root)
         # Update test fixture code without touching the user's working scenes.
         for sub in ('models','checks'):
-            shutil.copytree(projects.PACKAGE/'examples'/example/sub,root/sub,dirs_exist_ok=True)
-        shutil.copy2(projects.PACKAGE/'examples'/example/'project.toml',root/'project.toml')
-        shutil.copy2(projects.PACKAGE/'examples'/example/'parameters.json',root/'parameters.json')
+            shutil.copytree(source/sub,root/sub,dirs_exist_ok=True)
+        shutil.copy2(source/'project.toml',root/'project.toml')
+        shutil.copy2(source/'parameters.json',root/'parameters.json')
         decisions=read(root/'decisions.json');decisions['deliverables']='both';write(root/'decisions.json',decisions)
         # Explicit code source is appropriate for this disposable fixture reset.
         def build(root=root):

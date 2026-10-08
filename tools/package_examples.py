@@ -14,7 +14,7 @@ def main():
     target=Path(args.output);target.parent.mkdir(parents=True,exist_ok=True)
     with zipfile.ZipFile(target,'w',zipfile.ZIP_DEFLATED) as archive:
         archive.write('LICENSE','LICENSE')
-        for folder,name in [('organizer','desk_organizer'),('rocket','falcon9')]:
+        for folder,name in [('organizer','desk_organizer')]:
             project=projects.load(Path(args.workspace)/folder)
             run=engine.record(project,project['state']['safe_point'])
             if run['status']!='passed':raise ValueError('Only validated safe points can be packaged')

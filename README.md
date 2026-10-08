@@ -35,7 +35,7 @@ uv run geometryforge run E:/Models/Organizer
 uv run geometryforge viewer
 ```
 
-Open `http://127.0.0.1:8743`. For Blender-only output choose `--deliverables blender`; `geometry` uses `--backend` internally while print files are the requested deliverables. Internal native snapshots remain available for safe continuation. Choose `falcon9` for a multipart display model with keyed joints, stand, decorative legs and a fit coupon.
+Open `http://127.0.0.1:8743`. For Blender-only output choose `--deliverables blender`; `geometry` uses `--backend` internally while print files are the requested deliverables. Internal native snapshots remain available for safe continuation.
 
 Then ask your agent, for example:
 

@@ -83,7 +83,7 @@ def initialize(destination, example=None, ident=None, deliverables="both", backe
     if not ID.fullmatch(ident):
         raise ValueError("Use a lowercase project ID with underscores")
     if example:
-        if example not in ("desk_organizer", "falcon9"):
+        if example not in ("desk_organizer",):
             raise ValueError("Unknown example")
         shutil.copytree(PACKAGE / "examples" / example, destination, dirs_exist_ok=True)
         text = (destination / "project.toml").read_text(encoding="utf-8")
@@ -99,6 +99,15 @@ def initialize(destination, example=None, ident=None, deliverables="both", backe
     (destination / "CLAUDE.md").write_text("@AGENTS.md\n", encoding="utf-8")
     register(destination)
     return {"project": str(destination), "id": ident}
+
+def unregister(root):
+    """Remove a project from the viewer catalog; its folder and runs are left untouched."""
+    key = fingerprint(str(Path(root).resolve()))[:16]
+    with exclusive(HOME):
+        items = registry()
+        removed = items.pop(key, None)
+        write(HOME / "projects.json", items)
+    return removed
 
 def registry():
     return read(HOME / "projects.json", {})

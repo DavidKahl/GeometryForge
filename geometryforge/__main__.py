@@ -13,7 +13,7 @@ def main():
     sub = parser.add_subparsers(dest='command', required=True)
     p = sub.add_parser('install-skill'); p.add_argument('--target'); p.add_argument('--user', action='store_true'); p.add_argument('--harness', choices=['codex','claude','both'], default='both')
     sub.add_parser('doctor')
-    p = sub.add_parser('init'); p.add_argument('destination'); p.add_argument('--example', choices=['desk_organizer','falcon9']); p.add_argument('--id'); p.add_argument('--deliverables', choices=['geometry','blender','houdini','both'], default='both'); p.add_argument('--backend', choices=['blender','houdini'], default='blender'); p.add_argument('--brief', default=''); p.add_argument('--bed', nargs=3,type=float,default=[220,220,250])
+    p = sub.add_parser('init'); p.add_argument('destination'); p.add_argument('--example', choices=['desk_organizer']); p.add_argument('--id'); p.add_argument('--deliverables', choices=['geometry','blender','houdini','both'], default='both'); p.add_argument('--backend', choices=['blender','houdini'], default='blender'); p.add_argument('--brief', default=''); p.add_argument('--bed', nargs=3,type=float,default=[220,220,250])
     for name in ['context','status','history','register']:
         p = sub.add_parser(name); p.add_argument('project', nargs='?', default='.')
     for name in ['plan','run','verify']:
