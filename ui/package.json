@@ -12,7 +12,7 @@
   "devDependencies": {
     "@playwright/test": "1.63.0",
     "@types/three": "0.186.0",
-    "typescript": "5.9.3",
+    "typescript": "7.0.2",
     "vite": "7.1.12"
   }
 }
