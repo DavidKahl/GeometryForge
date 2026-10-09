@@ -12,7 +12,9 @@ GeometryForge lets a coding agent, [Claude Code](https://docs.claude.com/en/docs
 
 ## Watch the introduction
 
-The introduction video will be linked here.
+[![AI Builds My 3D Models Now. So What's Left for Me?](https://img.youtube.com/vi/L7bTOa_qrdc/maxresdefault.jpg)](https://youtu.be/L7bTOa_qrdc)
+
+How GeometryForge came to be, from hand-modeled chess pieces to agent-built, validated print kits: [watch on YouTube](https://youtu.be/L7bTOa_qrdc).
 
 ## What you get
 
