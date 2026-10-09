@@ -1,6 +1,8 @@
 # Contributing
 
-Thanks for your interest in GeometryForge! Bug reports, ideas, documentation fixes and code are all welcome. Please follow the [code of conduct](CODE_OF_CONDUCT.md).
+Thanks for your interest in GeometryForge! Bug reports, ideas and documentation fixes are all welcome. Please follow the [code of conduct](CODE_OF_CONDUCT.md).
+
+**Pull requests are currently limited to collaborators.** Please open an issue with your bug or idea instead; that's the fastest way to get it into GeometryForge. This may open up once the project has settled.
 
 ## Before you start
 
