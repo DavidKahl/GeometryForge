@@ -4,6 +4,8 @@ Support static props, modular pieces and rigid assemblies first. Rigging, skinni
 
 ## Establish the game brief
 
+Start reference-driven work with the reference intake in [SKILL.md](../SKILL.md#reference-intake): ask the route, map coverage, and either request missing views or get explicit acceptance of the listed assumptions. Hero props seen up close need far more coverage than background pieces.
+
 Record intended dimensions, camera/viewing distance, reference assumptions, style, conventional/Nanite profile, budgets, material regions, pivot, grid, sockets, collision and lighting. Keep game dimensions separate from physical print scale. Internal units remain mm; FBX/Unreal delivery converts to centimeters and GLB preview to meters/Y-up.
 
 Conventional defaults: 20,000 base triangles/output, two used material slots, 2048-pixel material maps, LOD ratios 1/.5/.25/.125. Nanite defaults: 250,000 source triangles/output, two materials, 2048-pixel maps, independent convex collision and recorded fallback error. Defaults are configurable production budgets, not universal engine limits. Fail and revise or change the profile; never silently sacrifice requested detail.

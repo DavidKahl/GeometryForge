@@ -11,6 +11,8 @@ uv run geometryforge plan C:/Models/Housing
 uv run geometryforge run C:/Models/Housing
 ```
 
+When you start from reference images, your agent runs a reference intake first: it confirms the route, reviews which surfaces the images actually show, and either asks for missing views or waits for you to accept its listed assumptions.
+
 The mechanical housing example keeps a detailed native design, makes a render representation, unwraps the actual evaluated topology, bakes five PBR maps, generates three LODs, and creates convex collision and an attachment socket. Its 256-pixel maps make the demonstration quick; texture resolution and bake samples are parameters. Increase them for production as the asset's viewing distance requires.
 
 Choose the Nanite profile with `run --target game --profile unreal_desktop_nanite`. The effective profile is recorded in the run; it does not rewrite project preferences. Conventional and Nanite are alternative game versions with their own retained runs. Keep print size separate from intended game size. Internally coordinates remain millimeters; FBX/Unreal uses centimeters and GLB uses meters with Y up.

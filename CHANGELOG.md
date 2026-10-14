@@ -14,6 +14,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Native Houdini SOP attribute extraction and license-aware production FBX/BAKE interfaces; commercial export/baking coverage remains explicit.
 - PBR game inspection, wireframe, LOD/collision, pivots/sockets, representation comparison and package/import evidence in the local viewer.
 - Mechanical housing example, game regression/browser tests and dedicated native validation tooling.
+- Skill reference intake: explicit print/game/both question, per-part reference coverage review, requests for missing views or explicit acceptance of listed assumptions before modeling, recorded as `decisions.reference_review`.
 
 ### Preserved
 

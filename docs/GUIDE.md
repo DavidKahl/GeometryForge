@@ -41,6 +41,8 @@ my_project/
 └── .geometryforge/       run records and retained evidence            ← local output
 ```
 
+If you start from reference images, the agent first asks whether you want a printable model, a game asset or both, then reviews what the images show. If views are missing it names them (and, for generated images, suggests a prompt for matching views). Otherwise it lists the assumptions it will make and waits for your go-ahead. The review is recorded under `reference_review` in `decisions.json`.
+
 `working/` and `.geometryforge/` are generated. Keep them out of version control and don't edit files under `.geometryforge/runs`: their hashes are how GeometryForge detects tampering and decides what can be reused.
 
 ### project.toml

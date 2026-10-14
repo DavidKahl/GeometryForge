@@ -4,7 +4,7 @@ Use this reference before deciding part construction, splitting or surface detai
 
 ## Establish the process envelope
 
-Reuse `decisions.json` and `context`; ask only for missing information that materially changes the model. A printer name does not establish the installed nozzle, filament, build plate or available support material. Prior examples and CLI initialization defaults are not confirmed user choices.
+Reuse `decisions.json` and `context`; ask only for missing information that materially changes the model. A printer name does not establish the installed nozzle, filament, build plate or available support material. Prior examples and CLI initialization defaults are not confirmed user choices. For reference-driven work, complete the reference intake in [SKILL.md](../SKILL.md#reference-intake) first; a print needs real thickness and attachment points that pictures rarely show.
 
 Record the relevant facts under `decisions.print`, preserving `bed_mm` and `nozzle_mm` for toolkit compatibility:
 

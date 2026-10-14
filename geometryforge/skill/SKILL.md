@@ -15,11 +15,24 @@ For a new project, establish the brief, dimensions, intended use, output route, 
 
 Establish the output route separately: `print`, `game`, or both. Existing v1 projects remain print projects. Use `init --target game|print|both` for v2, or explicitly `migrate --format 2` an existing project. `--deliverables both` still means Blender and Houdini native deliverables, not both delivery routes. Do not require a printer for game-only work.
 
-For game work read [game assets](references/game-assets.md), then [v2 contracts](references/targets.md). Record actual game dimensions, viewing distance, style, desktop profile, material/texture budgets, pivots, grid, sockets, collision and lighting. Interpret unseen reference surfaces explicitly. Use the shared editable design before deriving destination geometry; preserve high detail for later baking/printing. A successful print mesh or a dense Nanite import does not establish game suitability.
+For game work read [game assets](references/game-assets.md), then [v2 contracts](references/targets.md). Record actual game dimensions, viewing distance, style, desktop profile, material/texture budgets, pivots, grid, sockets, collision and lighting. Interpret unseen reference surfaces explicitly through the reference intake below. Use the shared editable design before deriving destination geometry; preserve high detail for later baking/printing. A successful print mesh or a dense Nanite import does not establish game suitability.
 
 For destination conversion read [conversion](references/conversion.md). Author the conversion recipe, declare its dependencies and outputs, then use `derive` with a retained run, source route and explicit scale. Derivation is not automatic history reconstruction. Preserve source snapshots and explain manufacturing-driven differences. Normal maps do not uniquely recover solid geometry.
 
 Read [contracts](references/contracts.md) when authoring a project. Read [Blender](references/blender.md) or [Houdini](references/houdini.md) for the selected backends.
+
+## Reference intake
+
+When a new project starts from reference images, complete this intake before writing geometry code. It applies to every route.
+
+1. **Output route.** Ask whether the result is a printable model, a game asset, or both, unless the user has already said so. Never infer it from the image, the example or CLI defaults; the route changes construction from the start.
+2. **Coverage.** List each image with its view direction. For each major part, state whether it is *seen*, *inferable* (symmetry, convention, a matching part) or a *guess*. Note scale cues, ambiguous connections and hidden surfaces. Judge against the route: a game asset needs every surface its camera will see at its viewing distance; a print needs real thickness, closure and attachment points.
+3. **Verdict.**
+   - *Not enough reference:* name the missing views precisely (e.g. "rear three-quarter", "underside of the pads", "side profile at the engine mounts") and why each matters. If the reference was generated, offer a short prompt the user can give their image tool to produce matching views of the same object. Then stop. Continue only when the views arrive or the user explicitly overrides; an override turns every gap into a listed assumption.
+   - *Enough reference:* give a final warning before starting: the assumptions you will make (every *guess*, and how you will resolve it), and which decisions will be expensive to change later. Ask for explicit acceptance. Do not model before it.
+4. **Record.** Copy the images into `references/` and store the review under `decisions.reference_review`: each reference's path, SHA-256 and view; the coverage map; `verdict` (`sufficient`, `insufficient` or `override`); requested views; assumptions; and who accepted, when. Until acceptance, keep `"Reference review not accepted"` in `decisions.unresolved` so `context` reports it. This is agent-maintained context, not an enforced schema.
+
+New references arriving later reopen the review for the parts they show. Explain departures from the accepted assumptions instead of silently changing them.
 
 ## Design for the target printer
 
