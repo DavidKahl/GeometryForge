@@ -5,10 +5,6 @@ import sys
 
 import bpy
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-
-
 def meshes():
     scene = bpy.context.scene
     if scene.get("geometryforge_units") != "mm" or abs(scene.unit_settings.scale_length - 0.001) > 1e-8:

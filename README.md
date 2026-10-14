@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)
 
-GeometryForge lets a coding agent, [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) or [Codex](https://developers.openai.com/codex), build 3D-printable models as real, editable **Blender** and **Houdini** projects. You describe what you want in plain language. The agent writes the modeling code, and GeometryForge runs it in the native applications, checks the result, exports print files and keeps a history of every iteration that you can inspect in a local browser viewer.
+GeometryForge lets a coding agent, [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) or [Codex](https://developers.openai.com/codex), build **game assets and printable models** as real, editable **Blender** and **Houdini** projects. Describe an idea or supply references. Your agent authors the design and destination recipes; GeometryForge executes them, validates each route independently, packages the results and retains inspectable history.
 
 ![The GeometryForge viewer showing the Astraeus Heavy Lander, its parts and its run history](docs/viewer-windows.png)
 
@@ -27,6 +27,8 @@ How GeometryForge came to be, from hand-modeled chess pieces to agent-built, val
 - **No AI service of its own.** GeometryForge has no API keys, model provider or chat. Your existing agent does the thinking; GeometryForge does deterministic execution and bookkeeping.
 
 ## Requirements
+
+Game projects add optional Unreal Engine integration. The first verified editor adapter targets Unreal 5.8 with PythonScriptPlugin and EditorScriptingUtilities enabled. Blender supplies the complete baked PBR example. Houdini retains native SOP game geometry/attributes; production FBX and native texture baking require a supported license. See [game assets](docs/GAME_ASSETS.md) for capabilities and coverage.
 
 | | Required | Notes |
 |---|---|---|
@@ -70,6 +72,25 @@ uv run geometryforge install-skill --user                           # all your p
 This writes `.claude/skills/geometryforge` and `.agents/skills/geometryforge` (for Codex). Existing `CLAUDE.md`/`AGENTS.md` files are left alone, and locally modified skill files are never overwritten. Restart your agent if the skill doesn't show up.
 
 ## Your first project
+
+For a game asset with an optional printable version:
+
+```powershell
+uv run geometryforge init C:/Models/Housing --example mechanical_prop --target game --deliverables blender
+uv run geometryforge plan C:/Models/Housing
+uv run geometryforge run C:/Models/Housing
+uv run geometryforge viewer
+```
+
+This creates editable detailed construction, a conventional game mesh with UVs, baked PBR maps, LODs, convex collision, a socket, FBX exports and GLB previews. Use `--profile unreal_desktop_nanite` for the Nanite representation. To derive a print version, use the game safe-point ID reported by `context`:
+
+```powershell
+uv run geometryforge derive C:/Models/Housing --target print --from-run <game-run-id> --from-target game --scale 1.25
+```
+
+Output routes and native applications are independent: `--target both` means game + print; `--deliverables both` still means Blender + Houdini. Existing v1 print projects continue to work; `migrate --format 2` creates backups before enabling target contracts. [Game workflow and project authoring](docs/GAME_ASSETS.md).
+
+For the existing print workflow:
 
 ```powershell
 uv run geometryforge init C:/Models/Organizer --example desk_organizer --deliverables both
@@ -119,6 +140,7 @@ The [user guide](docs/GUIDE.md) covers the full workflow: editing native files b
 
 - Geometry checks don't replace slicing, a material-specific fit test or a physical print. Print the fit coupon first.
 - GeometryForge exports STL and 3MF. It never slices for you or sends anything to a printer.
+- The game route exports FBX, GLB and PBR packages. Package validation, actual Unreal verification, rendered review and performance measurements have separate coverage; static geometry checks do not prove a frame-rate target.
 - Blender and Houdini versions are separate native implementations of the same design intent, compared by dimensions and volume. There's no automatic translation of construction history between them.
 - Project scripts are trusted local code and run unsandboxed in your applications. Only run projects you trust. See [SECURITY.md](SECURITY.md).
 - Houdini's own license terms (e.g. Apprentice: non-commercial, `.hipnc`) still apply to the files it produces.

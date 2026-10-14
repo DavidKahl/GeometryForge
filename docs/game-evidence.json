@@ -1,0 +1,284 @@
+{
+  "date": "2026-10-14",
+  "toolkit": "1.1.0",
+  "platform": "win32",
+  "python_tests": 42,
+  "browser_tests": 7,
+  "native_suite": "validation-workspace/game-20261014T092341Z/game-evidence.json",
+  "checks": [
+    {
+      "name": "Blender design, PBR baking, LOD/collision, save/reopen, FBX and GLB",
+      "passed": true,
+      "seconds": 7.09,
+      "run": "20261014T092341Z-9e3da21b",
+      "version": "5.2.1 LTS",
+      "native_structure": {
+        "native_objects": 9,
+        "modifiers": 8
+      },
+      "stages": [
+        "uv",
+        "materials",
+        "bake",
+        "lod",
+        "collision"
+      ],
+      "exports": {
+        "body": {
+          "passed": true,
+          "bbox_mm": [
+            80.00000762939453,
+            50.00000762939453,
+            40.0
+          ],
+          "uv_layers": 1
+        }
+      }
+    },
+    {
+      "name": "Unchanged run reuses preparation and FBX with a stable package ID",
+      "passed": true,
+      "seconds": 3.52,
+      "run": "20261014T092348Z-df5d4b09"
+    },
+    {
+      "name": "Material-only revision preserves geometry, UVs and collision",
+      "passed": true,
+      "seconds": 4.76,
+      "run": "20261014T092352Z-35fbf0a3"
+    },
+    {
+      "name": "Full verification invokes no modeling/UV/baking builders",
+      "passed": true,
+      "seconds": 3.64,
+      "run": "20261014T092356Z-4202d1ae"
+    },
+    {
+      "name": "Game-to-print conversion preserves source and applies physical scale",
+      "passed": true,
+      "seconds": 2.08,
+      "run": "20261014T092400Z-ca84bb7f",
+      "bbox_mm": [
+        100.0,
+        62.5,
+        50.0
+      ],
+      "scale": 1.25
+    },
+    {
+      "name": "Print-to-game conversion uses frozen lineage",
+      "passed": true,
+      "seconds": 4.05,
+      "run": "20261014T092402Z-f119bc5b"
+    },
+    {
+      "name": "Blender Nanite profile retains detail and exports fallback settings",
+      "passed": true,
+      "seconds": 6.42,
+      "run": "20261014T092406Z-9819eb96"
+    },
+    {
+      "name": "Unreal 5.8 conventional import, materials, units, LOD/collision and saved assets",
+      "passed": true,
+      "seconds": 12.72,
+      "run": "20261014T092341Z-9e3da21b",
+      "coverage": {
+        "commandlet": false,
+        "rendered_review": false,
+        "performance_measured": false,
+        "editor_automation": true,
+        "saved_assets": true
+      }
+    },
+    {
+      "name": "Unreal conventional saved import re-verification",
+      "passed": true,
+      "seconds": 13.38,
+      "run": "20261014T092341Z-9e3da21b",
+      "coverage": {
+        "commandlet": false,
+        "rendered_review": false,
+        "performance_measured": false,
+        "editor_automation": true,
+        "saved_assets": true
+      }
+    },
+    {
+      "name": "Unreal conventional offscreen rendered review and editor profiling",
+      "passed": true,
+      "seconds": 22.2,
+      "coverage": {
+        "commandlet": false,
+        "rendered_review": true,
+        "performance_measured": true,
+        "editor_automation": true,
+        "saved_assets": true
+      },
+      "hardware": {
+        "platform": "Windows-10-10.0.19045-SP0",
+        "cpu": "AMD64 Family 23 Model 113 Stepping 0, AuthenticAMD",
+        "logical_cpus": 32,
+        "ram_bytes": 68667924480,
+        "gpu": "NVIDIA GeForce RTX 3080",
+        "driver": "591.86"
+      },
+      "review": {
+        "resolution": [
+          1280,
+          720
+        ],
+        "asset_instances": 1,
+        "warmup_seconds": 5,
+        "editor_frames": 120,
+        "limits": "Editor review scene; this is not a cooked-game frame-rate guarantee. Inspect the screenshot and CSV on the target hardware.",
+        "capture": "game-standard.png"
+      }
+    },
+    {
+      "name": "Unreal 5.8 Nanite import, materials, units, LOD/collision and saved assets",
+      "passed": true,
+      "seconds": 12.83,
+      "run": "20261014T092406Z-9819eb96",
+      "coverage": {
+        "commandlet": false,
+        "rendered_review": false,
+        "performance_measured": false,
+        "editor_automation": true,
+        "saved_assets": true
+      }
+    },
+    {
+      "name": "Unreal Nanite saved import re-verification",
+      "passed": true,
+      "seconds": 12.47,
+      "run": "20261014T092406Z-9819eb96",
+      "coverage": {
+        "commandlet": false,
+        "rendered_review": false,
+        "performance_measured": false,
+        "editor_automation": true,
+        "saved_assets": true
+      }
+    },
+    {
+      "name": "Unreal Nanite offscreen rendered review and editor profiling",
+      "passed": true,
+      "seconds": 21.88,
+      "coverage": {
+        "commandlet": false,
+        "rendered_review": true,
+        "performance_measured": true,
+        "editor_automation": true,
+        "saved_assets": true
+      },
+      "hardware": {
+        "platform": "Windows-10-10.0.19045-SP0",
+        "cpu": "AMD64 Family 23 Model 113 Stepping 0, AuthenticAMD",
+        "logical_cpus": 32,
+        "ram_bytes": 68667924480,
+        "gpu": "NVIDIA GeForce RTX 3080",
+        "driver": "591.86"
+      },
+      "review": {
+        "resolution": [
+          1280,
+          720
+        ],
+        "asset_instances": 1,
+        "warmup_seconds": 5,
+        "editor_frames": 120,
+        "limits": "Editor review scene; this is not a cooked-game frame-rate guarantee. Inspect the screenshot and CSV on the target hardware.",
+        "capture": "game-nanite.png"
+      }
+    },
+    {
+      "name": "Houdini native design save/reopen and attribute extraction",
+      "passed": true,
+      "seconds": 1.7,
+      "run": "20261014T092548Z-e8f3330a",
+      "license": "licenseCategoryType.Apprentice",
+      "native_structure": {
+        "native_nodes": 4
+      },
+      "coverage": "design SOP extraction; production FBX/bake needs supported license"
+    },
+    {
+      "name": "Houdini editable PBR shader, UVs and direct attribute extraction",
+      "passed": true,
+      "details": {
+        "run": "20261014T091239Z-9e447aec",
+        "license": "licenseCategoryType.Apprentice",
+        "native_structure": {
+          "native_nodes": 8
+        },
+        "shader": "/mat/M_Source",
+        "uv_layers": [
+          "uv"
+        ]
+      }
+    },
+    {
+      "name": "Native doorway fixture with measured functional checks",
+      "passed": true,
+      "seconds": 2.44,
+      "run": "20261014T092551Z-e3c0450e",
+      "structure": {
+        "native_objects": 9,
+        "modifiers": 5
+      }
+    },
+    {
+      "name": "Native dense fixture with measured functional checks",
+      "passed": true,
+      "seconds": 9.7,
+      "run": "20261014T092554Z-b90563c6",
+      "structure": {
+        "native_objects": 3,
+        "modifiers": 2
+      }
+    },
+    {
+      "name": "Native shell fixture with measured functional checks",
+      "passed": true,
+      "seconds": 2.2,
+      "run": "20261014T092604Z-18350c5f",
+      "structure": {
+        "native_objects": 6,
+        "modifiers": 3
+      }
+    },
+    {
+      "name": "Legacy print organizer migrates and derives a game asset",
+      "passed": true,
+      "seconds": 4.7,
+      "run": "20261014T092609Z-46a3ab1b",
+      "source_v1_run": "20261014T092606Z-e8f68287"
+    }
+  ],
+  "coverage": {
+    "physical_print": false,
+    "slicer": false,
+    "rendered_unreal_review": true,
+    "performance": true
+  },
+  "legacy_native_regression": {
+    "passed": true
+  },
+  "packaging": {
+    "wheel": "geometryforge-1.1.0-py3-none-any.whl",
+    "source_distribution": "geometryforge-1.1.0.tar.gz",
+    "isolated_native_blender_build": true,
+    "isolated_run": "20261014T093245Z-d3122683"
+  },
+  "limits": [
+    "Houdini production FBX/BAKE needs licensed native validation",
+    "Editor profiling is not a cooked-game performance guarantee",
+    "No slicer review or physical print"
+  ],
+  "fresh_houdini_bootstrap": {
+    "passed": true,
+    "run": "20261014T093625Z-25f2855e",
+    "native_nodes": 8,
+    "source": "Dedicated owned session restarted and verified from saved source"
+  }
+}

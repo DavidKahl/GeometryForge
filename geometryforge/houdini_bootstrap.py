@@ -8,6 +8,7 @@ import sys
 import threading
 import traceback
 import types
+import importlib.util
 
 import hou
 
@@ -18,6 +19,15 @@ pending = queue.Queue()
 lock = threading.Lock()
 bridge.token = os.environ['GEOMETRYFORGE_SESSION_TOKEN']
 bridge.version = 2
+
+
+def load_package():
+    if 'geometryforge' not in sys.modules:
+        package_dir=Path(os.environ['GEOMETRYFORGE_ROOT'])/'geometryforge'
+        spec=importlib.util.spec_from_file_location('geometryforge',package_dir/'__init__.py',submodule_search_locations=[str(package_dir)])
+        module=importlib.util.module_from_spec(spec)
+        sys.modules['geometryforge']=module
+        spec.loader.exec_module(module)
 
 
 def submit(token, job_id, request_json):
@@ -55,9 +65,7 @@ def dispatch():
         return
     job['status'] = 'running'
     try:
-        root = os.environ['GEOMETRYFORGE_ROOT']
-        if root not in sys.path:
-            sys.path.insert(0, root)
+        load_package()
         import importlib
         from geometryforge import houdini_worker
         execute = importlib.reload(houdini_worker).execute
@@ -72,7 +80,7 @@ def dispatch():
 
 
 bridge.submit, bridge.status, bridge.cancel = submit, status, cancel
-sys.path.insert(0, os.environ['GEOMETRYFORGE_ROOT'])
+load_package()
 from geometryforge.houdini_transport import server as make_server
 server = make_server(int(os.environ['GEOMETRYFORGE_RPC_PORT']), bridge.token, {
     'hello': lambda: 2,

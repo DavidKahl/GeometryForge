@@ -1,14 +1,18 @@
 """Native execution adapters; the calling agent owns orchestration and recipes."""
 import json
+from contextvars import ContextVar
 from pathlib import Path
 from .storage import write, read
 from .projects import PACKAGE
 from .process import resolve_blender, run
 from .worker_env import worker_environment
 
+native_context = ContextVar('geometryforge_native_context', default={})
+
 def run_native(backend, out, entry, parameters, parts, source, timeout, executable=None):
     request = {"action": "native", "out": str(out), "entry": str(entry), "parameters": parameters,
                "parts": parts, "source": str(source) if source else None}
+    request.update(native_context.get())
     if backend == "blender":
         path = out / "request.json"
         write(path, request)
@@ -35,4 +39,9 @@ def doctor():
     from .kit import bambu_executable
     bambu = bambu_executable()
     result["bambu_studio"] = {"available": True, "executable": str(bambu)} if bambu else {"available": False, "optional": True, "error": "Not found; set GEOMETRYFORGE_BAMBU to use Bambu Studio packaging"}
+    from .unreal import capabilities
+    result['unreal'] = capabilities()
+    result['game_pipeline'] = {'blender': 'FBX, attribute-preserving GLB, Cycles baking',
+                               'houdini': 'Native SOP attributes; game exports require a supported license',
+                               'profiles': ['unreal_desktop_standard', 'unreal_desktop_nanite']}
     return result

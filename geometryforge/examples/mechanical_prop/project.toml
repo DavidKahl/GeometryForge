@@ -1,0 +1,46 @@
+format_version = 2
+[project]
+id = "mechanical_prop"
+title = "Mechanical housing — game and print"
+[backends.blender]
+entry = "models/blender.py"
+[backends.houdini]
+entry = "models/houdini.py"
+[parts.body]
+sources = []
+parameters = ["width", "depth", "height"]
+depends = []
+[targets.design]
+checks = []
+[targets.game]
+depends = ["design"]
+derivation_recipe = "native_housing_to_game"
+conversion_notes = ["Use retained detailed construction; keep a separate render mesh and convex collision."]
+checks = []
+[targets.game.stages.uv]
+entry = "models/uv.py"
+depends = ["geometry"]
+[targets.game.stages.materials]
+entry = "models/materials.py"
+parameters = ["roughness", "metallic"]
+depends = ["geometry"]
+[targets.game.stages.bake]
+entry = "models/bake.py"
+parameters = ["texture_resolution", "bake_samples"]
+depends = ["geometry", "uv", "materials"]
+[targets.game.stages.lod]
+entry = "models/lod.py"
+depends = ["geometry", "uv", "materials", "bake"]
+[targets.game.stages.collision]
+entry = "models/collision.py"
+depends = ["geometry"]
+[targets.print]
+depends = ["design"]
+derivation_recipe = "native_housing_to_print"
+conversion_notes = ["Retain physical surface detail and export at the requested derivation scale."]
+checks = ["dimensions"]
+[checks.dimensions]
+source = "checks/dimensions.py"
+parts = ["body"]
+parameters = ["width", "depth", "height"]
+targets = ["print"]

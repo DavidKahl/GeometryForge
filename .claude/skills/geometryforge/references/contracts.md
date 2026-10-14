@@ -1,5 +1,7 @@
 # Project contract v1
 
+This contract remains supported for existing print projects. For independent game/print routes and preparation stages use [v2 contracts](targets.md).
+
 The project directory contains project.toml, parameters.json, decisions.json, models/, checks/, working/ and .geometryforge/. The last two are local outputs. Geometry uses millimeters.
 
 project.toml has format_version=1, [project] id/title, [backends.blender] and/or [backends.houdini] with an entry path. Each [parts.<id>] declares sources (all Python/helpers influencing this part), parameters (keys), and depends (other part IDs whose changes affect this part). Cyclic mating dependencies are permitted; closure stops at a fixed point. Each [checks.<id>] declares source, optional helper sources, parts and parameters. Declare every input; undeclared dependencies defeat evidence reuse.

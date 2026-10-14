@@ -1,0 +1,9 @@
+{
+  "width": 80,
+  "depth": 50,
+  "height": 40,
+  "roughness": 0.45,
+  "metallic": 0.7,
+  "texture_resolution": 256,
+  "bake_samples": 8
+}

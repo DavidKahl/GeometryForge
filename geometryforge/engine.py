@@ -17,6 +17,8 @@ def run_path(project, ident):
     return project["root"] / ".geometryforge/runs" / ident
 
 def record(project, ident):
+    if ident in project.get('_records', {}):
+        return project['_records'][ident]
     return read(run_path(project, ident) / "run.json") if ident else None
 
 def selected_backends(project):
@@ -27,6 +29,9 @@ def selected_backends(project):
 
 def context(root):
     p = load(root)
+    if p['config']['format_version'] == 2:
+        from .targets import context as target_context
+        return target_context(root)
     current = inputs(p)
     backends = {}
     for backend in selected_backends(p):
@@ -50,13 +55,20 @@ def context(root):
             "issues": p["state"].get("issues", []) + p["decisions"].get("unresolved", []),
             "note": "Only saved files can be inspected. Save native-app edits before continuing."}
 
-def plan(root, backend=None, parts=(), full=False, source="auto"):
-    p = load(root)
+def plan(root, backend=None, parts=(), full=False, source="auto", target=None, profile=None, _project=None):
+    p = _project or load(root)
+    if p['config']['format_version'] == 2:
+        from .targets import plan as target_plan
+        return target_plan(root, backend, parts, full, source, target, profile)
+    if target not in (None, 'print') or profile:
+        raise ValueError('Migrate to project format 2 before selecting game targets or profiles')
     targets = [backend] if backend else selected_backends(p)
     if set(parts) - p["config"].get("parts", {}).keys():
         raise ValueError("Unknown selected part")
     results = {}
-    ctx = context(root)
+    ctx = context(root) if _project is None else {'backends': {
+        b: {'working_changed': bool(s.get('working') and (not inside(root, s['working']).is_file() or digest(inside(root, s['working'])) != s.get('working_hash')))}
+        for b, s in p['state']['backends'].items()}}
     for b in targets:
         if b not in p["config"].get("backends", {}):
             raise ValueError(f"Project has no {b} builder")
@@ -66,6 +78,8 @@ def plan(root, backend=None, parts=(), full=False, source="auto"):
         changed = set(parts) | {name for name in p["config"]["parts"] if prior.get("part_inputs", {}).get(name) != part_inputs(p, name)}
         if base and (base["inputs"].get(p["config"]["backends"][b]["entry"]) != inputs(p).get(p["config"]["backends"][b]["entry"])):
             changed.update(p["config"]["parts"])
+        if p.get('_target') == 'game' and base and prior.get('profile') != p['_settings'].get('profile', 'unreal_desktop_standard'):
+            changed.update(p['config']['parts'])
         manual = ctx["backends"].get(b, {}).get("working_changed", False)
         changed = closure(p["config"], changed)
         native_edits = set(prior.get('native_edits', []))
@@ -112,8 +126,13 @@ def artifact_ok(p, artifact):
 def artifact(p, path):
     return {"path": str(path.relative_to(p["root"])).replace("\\", "/"), "sha256": digest(path)}
 
-def execute(root, backend=None, parts=(), full=False, source="auto", timeout=900, executables=None):
+def execute(root, backend=None, parts=(), full=False, source="auto", timeout=900, executables=None, target=None, profile=None):
     p = load(root)
+    if p['config']['format_version'] == 2:
+        from .targets import execute as target_execute
+        return target_execute(root, backend, parts, full, source, timeout, executables, target, profile)
+    if target not in (None, 'print') or profile:
+        raise ValueError('Migrate to project format 2 before selecting game targets or profiles')
     with exclusive(p["root"] / ".geometryforge"):
         p = load(root)
         proposal = plan(root, backend, parts, full, source)
@@ -200,14 +219,24 @@ def execute_backend(p, data, out, frozen, backend, spec, full, timeout, executab
     known = set(p["config"]["parts"])
     if set(grouped) != known:
         raise ScopeUncertain(f"Scene part IDs differ from project: missing {sorted(known-set(grouped))}, extra {sorted(set(grouped)-known)}. Update the part/check contract before verification.")
-    hashes = {name: geometry_hash(objects) for name, objects in grouped.items()}
+    target = p.get('_target', 'print')
+    from .game import evidence_key
+    hashes = {name: evidence_key(objects) if target != 'print' else geometry_hash(objects) for name, objects in grouped.items()}
+    if target != 'print':
+        from .game import evidence_equivalent
+        for name,objects in grouped.items():
+            if hashes[name]==prior.get('geometry',{}).get(name): continue
+            raw=next((a for a in prior.get('parts',{}).get(name,{}).get('artifacts',[]) if a['path'].endswith('/assembly.json')),None)
+            if raw and artifact_ok(p,raw) and evidence_equivalent(objects,read(inside(p['root'],raw['path']))['objects']):
+                hashes[name]=prior['geometry'][name]
     changed = {name for name in known if hashes[name] != prior.get("geometry", {}).get(name)}
     affected = closure(p["config"], changed | set(rebuild))
     if scene and spec["source"] == "code" and changed - set(rebuild):
         raise ScopeUncertain(f"Revision changed unselected geometry: {sorted(changed-set(rebuild))}. Inspect dependencies or explicitly use the edited scene.")
     native_path = Path(result["scene"])
     procedural = dict(prior.get('procedural_geometry', {n:h for n,h in prior.get('geometry', {}).items() if n not in prior.get('native_edits', [])}))
-    for name in rebuild:
+    prepared = {part for stage in spec.get('stages',{}).values() if stage.get('run') for part in stage.get('parts',[])}
+    for name in set(rebuild) | prepared:
         procedural[name] = hashes[name]
     info = {"version": result["version"], "license": result.get("license"), "geometry": hashes,
             "procedural_geometry": procedural,
@@ -217,7 +246,19 @@ def execute_backend(p, data, out, frozen, backend, spec, full, timeout, executab
             "changed_parts": sorted(changed), "rebuilt_parts": rebuild, "affected_parts": sorted(affected),
             "parts": {}, "checks": {}, "native": artifact(p, native_path), "source": spec["source"]}
     data["backends"][backend] = info
-    tool_key = fingerprint([result["version"], data["engine_version"], data["decisions"].get("print", {})])
+    info['target'] = target
+    if result.get('mesh_exports'):
+        info['mesh_exports'] = result['mesh_exports']
+    info['profile'] = p.get('_settings', {}).get('profile', 'unreal_desktop_standard') if target == 'game' else None
+    tool_key = fingerprint([result['version'], data['engine_version'], p.get('_settings', data['decisions'].get('print', {}))])
+    if target == 'game':
+        from .game import package
+        effective_settings = {**p.get('_settings', {}), 'derivation':data['decisions'].get('derivations', {}).get(target)}
+        game = package(result['objects'], directory / 'game', effective_settings,
+                       root=p['root'], frozen=frozen, exports=result.get('mesh_exports', {}),
+                       prior=prior.get('game'), full=full)
+        game['artifacts'] = [artifact(p, f) for f in sorted((directory / 'game').rglob('*')) if f.is_file()]
+        info['game'] = game
     for name in sorted(known):
         old = prior.get("parts", {}).get(name, {})
         key = fingerprint([hashes[name], tool_key])
@@ -228,12 +269,21 @@ def execute_backend(p, data, out, frozen, backend, spec, full, timeout, executab
         part_dir.mkdir(parents=True)
         raw = part_dir / "assembly.json"
         write(raw, {"units": "mm", "objects": grouped[name]})
-        report = export(raw, part_dir, data["decisions"].get("print", {}))
+        if target == 'print':
+            report = export(raw, part_dir, data['decisions'].get('print', {}))
+        else:
+            from .game import measurements
+            report = {'parts': [measurements(name, grouped[name])]}
         from .preview import preview
         preview(grouped[name], part_dir / "preview.png")
-        files = [raw, part_dir / "preview.png", *sorted((part_dir / "prints").iterdir()), *sorted((part_dir / "checks").iterdir())]
+        files = [raw, part_dir / 'preview.png']
+        if target == 'print':
+            files += [*sorted((part_dir / 'prints').iterdir()), *sorted((part_dir / 'checks').iterdir())]
+        if target == 'game':
+            files += [f for f in (directory / 'game').rglob('*') if f.is_file() and f.name.startswith(name + '.')]
         import numpy as np
-        vertices = np.concatenate([o['vertices'] for o in grouped[name]])
+        from .game import world_vertices
+        vertices = np.concatenate([world_vertices(o) if target != 'print' else o['vertices'] for o in grouped[name]])
         bounds = [vertices.min(axis=0).tolist(), vertices.max(axis=0).tolist()]
         info["parts"][name] = {"key": key, "reused": False, "artifacts": [artifact(p, f) for f in files], "measurements": report["parts"][0], "assembly_bounds_mm": bounds}
     for name, check in p["config"].get("checks", {}).items():
@@ -244,7 +294,10 @@ def execute_backend(p, data, out, frozen, backend, spec, full, timeout, executab
         if not full and old.get("key") == key and old.get("passed"):
             info["checks"][name] = {**old, "reused": True, "from_run": old.get("from_run") or state["run"]}
             continue
-        payload = {"parameters": data["parameters"], "objects": {n: grouped[n] for n in check["parts"]}, "check": name}
+        payload = {"parameters": data["parameters"], "objects": {n: grouped[n] for n in check["parts"]}, "check": name,
+                   'backend': backend,
+                   'target': target, 'settings': p.get('_settings', {}),
+                   'derivation': data['decisions'].get('derivations', {}).get(target)}
         payload_path = directory / "checks" / f"{name}-input.json"
         write(payload_path, payload)
         report_path = directory / "checks" / f"{name}.json"
@@ -256,15 +309,19 @@ def execute_backend(p, data, out, frozen, backend, spec, full, timeout, executab
         if code or not check_result["passed"]:
             raise ValueError(f"{backend}: check {name} failed: {check_result}")
     # Whole-model files are rebuilt every run from the evaluated scene: cheap, and they always match it.
-    from .kit import write_kits, bambu_package
-    kit_dir = directory / "kit"
-    constraints = data["decisions"].get("print", {})
-    kit = write_kits(grouped, kit_dir, constraints)
-    kit["bambu"] = bambu_package(kit_dir, constraints, kit["parts"], timeout)
-    kit["artifacts"] = [artifact(p, kit_dir / f) for f in ("kit.3mf", "assembled-bambu.3mf", "assembled.3mf", "kit-raw.3mf") if (kit_dir / f).is_file()]
-    info["kit"] = kit
+    if target == 'print':
+        from .kit import write_kits, bambu_package
+        kit_dir = directory / 'kit'
+        constraints = data['decisions'].get('print', {})
+        kit = write_kits(grouped, kit_dir, constraints)
+        kit['bambu'] = bambu_package(kit_dir, constraints, kit['parts'], timeout)
+        kit['artifacts'] = [artifact(p, kit_dir / f) for f in ('kit.3mf', 'assembled-bambu.3mf', 'assembled.3mf', 'kit-raw.3mf') if (kit_dir / f).is_file()]
+        info['kit'] = kit
     # Make a new editable file, never replace a user-edited scene.
-    working = p["root"] / "working" / data["id"] / backend / native_path.name
+    working = p['root'] / 'working' / data['id']
+    if p.get('_target'):
+        working = working / target
+    working = working / backend / native_path.name
     working.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(native_path, working)
     return {"run": data["id"], "working": str(working.relative_to(p["root"])), "working_hash": digest(working), "stale": False}
@@ -279,14 +336,17 @@ def parity(p, data):
             failures.append(part + ': assembly bounds or placement differ by more than 0.1 mm')
         if any(abs(i-j) > 0.1 for i,j in zip(x["bbox_mm"], y["bbox_mm"])):
             failures.append(part + ": native dimensions differ by more than 0.1 mm")
-        if abs(x["volume_mm3"]-y["volume_mm3"]) > max(1, x["volume_mm3"] * .01):
+        if p.get('_target', 'print') == 'print' and abs(x["volume_mm3"]-y["volume_mm3"]) > max(1, x["volume_mm3"] * .01):
             failures.append(part + ": native volumes differ by more than 1%")
     data["validation"]["native_parity"] = {"passed": not failures, "failures": failures, "method": "part identity, dimensions, volume and shared functional checks"}
     if failures:
         raise ScopeUncertain("Native outputs need reconciliation: " + "; ".join(failures))
 
-def restore(root, ident=None):
+def restore(root, ident=None, target=None):
     p = load(root)
+    if p['config']['format_version'] == 2:
+        from .targets import restore as target_restore
+        return target_restore(root, ident, target)
     with exclusive(p["root"] / ".geometryforge"):
         p = load(root)
         ident = ident or p["state"].get("safe_point")
@@ -309,8 +369,13 @@ def restore(root, ident=None):
             shutil.copy2(original, dest)
         return {"restored_from": ident, "working_copy": str(target), "note": "Existing working files and active sources preserved. Use adopt to select a restored native scene; sources/ contains matching procedural inputs."}
 
-def adopt(root, backend, file):
+def adopt(root, backend, file, target=None):
     p = load(root)
+    if p['config']['format_version'] == 2:
+        from .targets import adopt as target_adopt
+        if not target:
+            raise ValueError('v2 adopt requires --target to preserve route ownership')
+        return target_adopt(root, backend, file, target)
     with exclusive(p["root"] / ".geometryforge"):
         p = load(root)
         source = Path(file).resolve()

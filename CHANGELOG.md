@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [semantic versioning](https://semver.org/).
 
+## [1.1.0] - 2026-10-14
+
+### Added
+
+- Backward-compatible v2 projects with independent game/print targets, optional shared design, output/source mappings and route safe points.
+- Explicit migration backups, frozen derivation recipes/scales, route-aware scene adoption/restoration and incremental preparation stages.
+- Blender game extraction preserving UV seams, normals/tangents, materials and placement; editable preparation, PBR baking, LOD and convex collision helpers.
+- Conventional/Nanite desktop profiles; FBX native read-back, attribute-preserving GLB previews, DirectX/OpenGL normal variants, ORM textures and hashed portable packages.
+- Optional Unreal 5.8 imports, saved-asset verification, offscreen review/editor profiling and versioned managed namespaces protecting artist changes.
+- Native Houdini SOP attribute extraction and license-aware production FBX/BAKE interfaces; commercial export/baking coverage remains explicit.
+- PBR game inspection, wireframe, LOD/collision, pivots/sockets, representation comparison and package/import evidence in the local viewer.
+- Mechanical housing example, game regression/browser tests and dedicated native validation tooling.
+
+### Preserved
+
+- v1 print behavior, editable native construction, retained scenes/snapshots, print exports/kits and agent-owned modeling. No embedded provider, credentials, chat, build controls or autonomous queue.
+
 ## [1.0.0] - 2026-10-09
 
 First public release.

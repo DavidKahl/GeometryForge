@@ -6,6 +6,19 @@ What has actually been verified, on what, and when. Nothing here claims a physic
 
 Windows, Python 3.12.13, Blender 5.2.1 LTS, Houdini 22.0.368 Apprentice (saves `.hipnc` through its supported GUI/OBJ workflow), Bambu Studio 2.8.2.
 
+## Game routes release checks (14 October 2026)
+
+- **42 Python tests passed**, including v1 migration/restoration, independent target safe points, valid open game surfaces, attribute/texture provenance, stage invalidation, missing LOD delivery, UV overlap, rigid transforms, preparation-preserving verification and native package loading without host ABI leakage.
+- **7 Chromium tests passed**, including PBR texture loading, route selection, LOD/wireframe/collision/pivot controls, representation comparison and game package downloads. The prebuilt viewer was rebuilt from the checked sources.
+- **Blender 5.2.1 LTS** built and reopened the editable mechanical housing, baked PBR maps, exported/reopened FBX and wrote/read GLB. Unchanged runs reused preparation/FBX with a stable package ID. Material-only changes preserved source geometry, UVs and collision. Full verification invoked zero builders. Frozen conversion worked in both directions at explicit scales.
+- **Unreal 5.8.3** imported conventional and Nanite packages into a disposable project and reopened saved assets. Dimensions, LODs, convex collision, declared material instances, texture color spaces and Nanite/fallback settings passed. Separate offscreen reviews produced 1280×720 captures and 120-frame editor profiling CSVs on an NVIDIA GeForce RTX 3080, driver 591.86, 32 logical CPUs and 64 GiB RAM. Managed shader compilation errors are rejected. Editor profiling is not a cooked-game performance guarantee.
+- **Additional native fixtures** passed: a 3 m doorway whose 21-sample traversal path stays outside all three convex collision bodies; a displaced 20,480-triangle Nanite rock; a printable shell with measured 2 mm walls/floor and a coupon with measured 0.2 mm radial clearance; and a legacy printable organizer migrated and derived into a game asset.
+- **Houdini 22.0.368 Apprentice** saved/reopened native design/SOP geometry and retained UV/material attributes with an editable Principled shader. Commercial game FBX export and production BAKE ROP execution were not verified on the installed Apprentice license; the adapter reports unsupported capability rather than bypassing restrictions.
+- **Legacy native regressions passed again** in Blender and Houdini: organizer/rocket construction, incremental part/interface checks, saved manual edits, source-preserving full verification and restoration. Existing print geometry and kit behavior remained intact.
+- **Packaging** produced the 1.1.0 wheel and source distribution. The wheel installed into a separate Python 3.12 environment, initialized the shipped game example and built/validated it natively from outside the checkout. Its optional viewer routes and bundled assets were present. Canonical skills were refreshed for both harnesses.
+
+Recorded summary: [game-evidence.json](game-evidence.json). Review captures: [conventional](game-standard.png) and [Nanite](game-nanite.png). Raw run/import/profiling artifacts remain in the dedicated timestamped validation workspaces. No slicer review or physical print is claimed by these game checks.
+
 ## Automated tests (8 October 2026)
 
 - **23 Python tests passed.** They cover dependency closure, incremental artifact and check reuse, checker invalidation, corrupted outputs, source conflicts, manual-scene continuation, source-preserving full verification, restoration, locking, snapshot integrity, failure and cancellation, independent backend freshness, the installer, the viewer API (registration, rename/archive, artifact boundaries, Host validation, same-origin writes, session tokens, inline/attachment downloads), and whole-model 3MF files (slot read-back, undeclared slots, Bambu packaging).

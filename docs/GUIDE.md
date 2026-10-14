@@ -10,6 +10,7 @@ Most of the time you won't type these commands yourself. Your agent runs them th
 - [Editing native files by hand](#editing-native-files-by-hand)
 - [The viewer](#the-viewer)
 - [Printing and multi-material](#printing-and-multi-material)
+- [Game assets and printable derivatives](GAME_ASSETS.md)
 - [Writing builders and checks](#writing-builders-and-checks)
 - [Configuration](#configuration)
 - [Troubleshooting](#troubleshooting)
@@ -19,7 +20,7 @@ Most of the time you won't type these commands yourself. Your agent runs them th
 After `geometryforge install-skill`, ask your agent to "use GeometryForge" for a modeling task. The skill makes it:
 
 1. Run `geometryforge context` to read the current state of an existing project.
-2. For a new model, establish the brief, dimensions, intended use, **target printer and process**, and which native files you want (`blender`, `houdini` or `both`). It asks only for decisions that change the design and records them in `decisions.json` and `parameters.json`.
+2. For a new model, establish the brief, dimensions, intended use and **output route** (`print`, `game` or both), separately from native files (`blender`, `houdini` or both). Print work adds printer/process choices; game work adds profile, materials, pivots and collision. Record choices in `decisions.json` and dimensions in `parameters.json`.
 3. Plan the print before detailing: orientation, splits to fit the bed, wall and detail sizes for your nozzle, joint clearances, supports and assembly order.
 4. Write the modeling code, run `plan`, then `run` with the smallest sensible set of parts.
 5. Report what was actually verified, keeping geometry checks, slicer review and physical testing separate.

@@ -18,7 +18,8 @@ def main():
     sub.add_parser('doctor', help='Report the Blender, Houdini and Bambu Studio executables that will be used')
     p = sub.add_parser('init', help='Create a new project folder (empty or from a bundled example)')
     p.add_argument('destination', help='Empty or new project folder')
-    p.add_argument('--example', choices=['desk_organizer'], help='Start from a bundled example')
+    p.add_argument('--example', choices=['desk_organizer','mechanical_prop'], help='Start from a bundled example')
+    p.add_argument('--target', choices=['print','game','both'], help='Output route; creates a format-v2 project')
     p.add_argument('--id', help='Project ID (lowercase, underscores; default: folder name)')
     p.add_argument('--deliverables', choices=['geometry','blender','houdini','both'], default='both', help='Native files to produce')
     p.add_argument('--backend', choices=['blender','houdini'], default='blender', help="Application used when deliverables is 'geometry'")
@@ -34,6 +35,8 @@ def main():
         p = sub.add_parser(name, help=text)
         p.add_argument('project', nargs='?', default='.', help='Project folder (default: current folder)')
         p.add_argument('--backend', choices=['blender','houdini'], help='Limit to one application')
+        p.add_argument('--target', choices=['print','game','both','design'], help='Limit to one delivery route')
+        p.add_argument('--profile', choices=['unreal_desktop_standard','unreal_desktop_nanite'], help='Effective game profile recorded with the run')
         p.add_argument('--parts', nargs='*', default=[], help='Rebuild these part IDs (plus their dependents)')
         p.add_argument('--full', action='store_true', help='Ignore reusable evidence and re-run every export and check')
         p.add_argument('--source', choices=['auto','scene','code'], default='auto', help='Use the saved native scene, regenerate from code, or decide automatically')
@@ -42,9 +45,34 @@ def main():
         p.add_argument('--houdini', help='Houdini executable (overrides GEOMETRYFORGE_HOUDINI)')
     p = sub.add_parser('restore', help='Copy a safe point into a new working folder (current work is kept)')
     p.add_argument('project', nargs='?', default='.', help='Project folder (default: current folder)'); p.add_argument('--run', help='Run ID (default: the safe point)')
+    p.add_argument('--target', choices=['print','game','design'], help='Restore one independently validated route')
     p = sub.add_parser('adopt', help='Make a saved .blend/.hip file the working scene for a backend')
     p.add_argument('project', help='Project folder'); p.add_argument('--backend', choices=['blender','houdini'], required=True, help='Application the file belongs to')
     p.add_argument('--file', required=True, help='Saved native file to copy in')
+    p.add_argument('--target', choices=['print','game','design'], help='Working-scene route (required for v2)')
+    p = sub.add_parser('migrate', help='Back up and upgrade a legacy project contract')
+    p.add_argument('project', nargs='?', default='.')
+    p.add_argument('--format', type=int, choices=[2], default=2)
+    p = sub.add_parser('derive', help='Execute a declared conversion recipe from a retained source')
+    p.add_argument('project', nargs='?', default='.')
+    p.add_argument('--target', choices=['print','game'], required=True)
+    p.add_argument('--from-run', required=True)
+    p.add_argument('--from-target', choices=['print','game','design'], required=True)
+    p.add_argument('--scale', type=float, default=1.0, help='Source-to-destination linear scale')
+    p.add_argument('--backend', choices=['blender','houdini'])
+    p.add_argument('--timeout', type=int, default=900)
+    p.add_argument('--blender'); p.add_argument('--houdini')
+    p = sub.add_parser('unreal', help='Optional Unreal editor import and saved-asset verification')
+    commands = p.add_subparsers(dest='unreal_command', required=True)
+    for name in ('import','verify','review'):
+        p = commands.add_parser(name)
+        p.add_argument('project', nargs='?', default='.')
+        p.add_argument('--uproject', required=True)
+        p.add_argument('--run')
+        p.add_argument('--import', dest='import_id', required=name in ('verify','review'))
+        p.add_argument('--backend', choices=['blender','houdini'], default='blender')
+        p.add_argument('--editor', help='Editor executable or engine installation')
+        p.add_argument('--timeout', type=int, default=1200)
     p = sub.add_parser('viewer', help='Start the local browser viewer (http://127.0.0.1:8743)'); p.add_argument('--port', type=int, default=8743, help='Port to listen on')
     p = sub.add_parser('session', help='Inspect or stop the managed Houdini session'); p.add_argument('action', choices=['status','stop'])
     args=parser.parse_args()
@@ -57,7 +85,7 @@ def main():
             from .backends import doctor
             result=doctor()
         elif args.command == 'init':
-            result=projects.initialize(args.destination,args.example,args.id,args.deliverables,args.backend,args.brief,args.bed)
+            result=projects.initialize(args.destination,args.example,args.id,args.deliverables,args.backend,args.brief,args.bed,args.target)
         elif args.command in ('context','status'):
             result=engine.context(args.project)
         elif args.command == 'register':
@@ -66,14 +94,23 @@ def main():
             from .storage import read
             result=[read(p) for p in sorted((projects.load(args.project)['root']/'.geometryforge/runs').glob('*/run.json'),reverse=True)]
         elif args.command == 'plan':
-            result=engine.plan(args.project,args.backend,args.parts,args.full,args.source)
+            result=engine.plan(args.project,args.backend,args.parts,args.full,args.source,args.target,args.profile)
         elif args.command in ('run','verify'):
             source='scene' if args.command=='verify' else args.source
-            result=engine.execute(args.project,args.backend,args.parts,args.full,source,args.timeout,{'blender':args.blender,'houdini':args.houdini})
+            result=engine.execute(args.project,args.backend,args.parts,args.full,source,args.timeout,{'blender':args.blender,'houdini':args.houdini},args.target,args.profile)
         elif args.command == 'restore':
-            result=engine.restore(args.project,args.run)
+            result=engine.restore(args.project,args.run,args.target)
         elif args.command == 'adopt':
-            result=engine.adopt(args.project,args.backend,args.file)
+            result=engine.adopt(args.project,args.backend,args.file,args.target)
+        elif args.command == 'migrate':
+            from .targets import migrate
+            result=migrate(args.project,args.format)
+        elif args.command == 'derive':
+            from .targets import derive
+            result=derive(args.project,args.target,args.from_run,args.from_target,args.scale,args.backend,args.timeout,{'blender':args.blender,'houdini':args.houdini})
+        elif args.command == 'unreal':
+            from .unreal import execute
+            result=execute(args.project,args.uproject,args.run,args.backend,args.editor,args.timeout,args.import_id,args.unreal_command in ('verify','review'),args.unreal_command=='review')
         elif args.command == 'session':
             from .houdini import current, request, terminate
             current_session=current()

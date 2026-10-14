@@ -56,12 +56,26 @@ def resolve_blender(explicit=None) -> str:
     return found
 
 
-def run(command, *, cwd, env=None, log=None, timeout=None) -> int:
+def run(command, *, cwd, env=None, log=None, timeout=None, native_options=False) -> int:
     """No shell interpolation; terminate the whole process tree on interruption."""
     output = open(log, "w", encoding="utf-8") if log else None
     proc = None
     try:
-        proc = subprocess.Popen([str(x) for x in command], cwd=cwd, env=env,
+        arguments = [str(x) for x in command]
+        if os.name == 'nt' and native_options:
+            # Unreal parses the raw Windows command line, not CRT argv. Quote
+            # option values after '=' so FParse retains spaces in scripts/ExecCmds.
+            encoded=[]
+            for argument in arguments:
+                if argument.startswith('-') and '=' in argument:
+                    key,value=argument.split('=',1)
+                    if any(c in value for c in ('\r','\n','"')):
+                        raise ValueError('Unreal option values cannot contain newlines or double quotes')
+                    encoded.append(key+'="'+value+'"')
+                else:
+                    encoded.append(subprocess.list2cmdline([argument]))
+            arguments=' '.join(encoded)
+        proc = subprocess.Popen(arguments, cwd=cwd, env=env,
                                 stdout=output, stderr=subprocess.STDOUT if output else None,
                                 start_new_session=os.name != "nt")
         started = time.monotonic()

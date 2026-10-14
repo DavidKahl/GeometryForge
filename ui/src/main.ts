@@ -5,6 +5,8 @@ import {addGround,makePane,Viewer,type Pane} from './scene';
 import {baseName,renderParts,type Diff,type PartsState,type Row} from './parts';
 import {renderRuns} from './runs';
 import {openLightbox,type Item} from './lightbox';
+import {gameMaterial,clearGameTextures} from './game';
+import type {ImportEvidence} from './api';
 
 document.querySelector('#app')!.innerHTML=`
 <aside><a class="brand" href="/">◈ <span>GeometryForge<small>LOCAL WORKSHOP</small></span></a><div class="section-title">PROJECTS <button id="add" class="icon" title="Register or create project">＋</button></div><div id="projects"></div><label class="archived"><input id="show-archived" type="checkbox"> Show archived</label><footer>Built in your agent.<br>Inspected here.</footer></aside>
@@ -19,6 +21,7 @@ document.querySelector('#app')!.innerHTML=`
 <div id="compare-mode" class="segmented" hidden><button data-mode="split" class="active">Side by side</button><button data-mode="overlay">Overlay</button></div>
 <select id="backend" aria-label="Backend"><option>blender</option><option>houdini</option></select><button id="fit" class="small" title="Fit view (F)">Fit</button></div>
 <div id="diff" class="diff" hidden></div>
+<div id="route-toolbar" class="toolbar" hidden><label>Representation <select id="target" aria-label="Representation"></select></label><label>Compare representation <select id="compare-target" aria-label="Compare representation"></select></label><label><input id="normalize" type="checkbox"> Normalize comparison size</label><span id="game-tools"><label><input id="wireframe" type="checkbox"> Wireframe</label><label><input id="collision" type="checkbox"> Collision</label><label><input id="pivots" type="checkbox"> Pivots / sockets</label><label>LOD <select id="lod" aria-label="LOD"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label></span></div>
 <div id="viewport"><div id="overlays"></div><div class="empty" id="empty">Your geometry will appear here.<br><small>Select a run to explore its parts.</small></div><div id="progress" hidden></div><div id="hover" hidden></div><span id="dimensions"></span></div>
 <div class="hint">Click a part to select · Ctrl/Shift-click to add · double-click or <kbd>I</kbd> to isolate · <kbd>H</kbd> hide · <kbd>Alt</kbd>+<kbd>H</kbd> show all · <kbd>F</kbd> fit · <kbd>Esc</kbd> back</div>
 </section>
@@ -36,10 +39,16 @@ document.querySelector('#app')!.innerHTML=`
 const $=(id:string)=>document.getElementById(id)!;
 const viewer=new Viewer($('viewport'));
 let projects:Record<string,Project>={},runs:Run[]=[],ctx:Context|undefined,revision=0;
+let importEvidence:ImportEvidence[]=[];
 let runA:Run|undefined,runB:Run|undefined,loadedA=new Map<string,Loaded>(),loadedB:Map<string,Loaded>|undefined;
 let colourMode:'part'|'filament'='part',pose:'assembly'|'print'='assembly',mode:'split'|'overlay'='split',hovered:string|undefined,assemblyCamera:ReturnType<Viewer['saveCamera']>|undefined;
 const state:PartsState={selection:new Set(),hidden:new Set(),filter:'',collapsed:new Set(),isolated:null};
 const backendName=()=>($('backend') as HTMLSelectElement).value;
+const targetName=()=>($('target') as HTMLSelectElement).value||'print';
+const compareTargetName=()=>($('compare-target') as HTMLSelectElement).value||targetName();
+const activeBackend=(run?:Run,comparison=false)=>run?.targets?run.targets[comparison?compareTargetName():targetName()]?.backends[backendName()]:run?.backends[backendName()];
+const safePoint=()=>ctx?.targets?.[targetName()]?.safe_point??ctx?.safe_point;
+const checked=(id:string)=>($ (id) as HTMLInputElement).checked;
 const sha=(l:Loaded|undefined)=>find(l?.part,'/assembly.json')?.sha256;
 
 function toast(message:string){$('toast').textContent=message;setTimeout(()=>$('toast').textContent='',5000)}
@@ -57,8 +66,14 @@ function filamentColour(run:Run|undefined,slot:number){return new THREE.Color(fi
 function partObject(l:Loaded,ghost=false,run?:Run){
   const holder=new THREE.Group(),body=new THREE.Group();holder.userData.part=l.name;holder.add(body);
   for(const [i,geometry] of l.geometries.entries()){const colour=colourMode==='filament'?filamentColour(run,l.filaments[i]):partColor(l.name);
-    const mesh=new THREE.Mesh(geometry,ghost?ghostMaterial():new THREE.MeshStandardMaterial({color:colour,roughness:.55,metalness:.05}));
+    const info=l.meshInfo[i],game=!!l.game;
+    if(game&&info.role==='collision'&&!checked('collision'))continue;
+    if(game&&info.role!=='collision'&&info.lod!==Number(($('lod') as HTMLSelectElement).value))continue;
+    const material=ghost?ghostMaterial():game&&info.role==='collision'?new THREE.MeshStandardMaterial({color:0x62ef96,wireframe:true,transparent:true,opacity:.6}):game?info.materialIds.map(id=>gameMaterial(l,id)):new THREE.MeshStandardMaterial({color:colour,roughness:.55,metalness:.05});
+    const mesh=new THREE.Mesh(geometry,Array.isArray(material)&&!material.length?new THREE.MeshStandardMaterial({color:colour}):material);
+    if(game&&checked('wireframe'))for(const m of Array.isArray(mesh.material)?mesh.material:[mesh.material])m.wireframe=true;
     mesh.userData.part=ghost?undefined:l.name;mesh.userData.ghost=ghost;body.add(mesh)}
+  if(l.game&&checked('pivots')){const info=l.meshInfo.find(x=>x.role==='render');if(info){const size=Math.max(...l.part.measurements?.bbox_mm??[10])*.15;const axes=new THREE.AxesHelper(size);axes.position.fromArray(info.pivot);body.add(axes);for(const socket of info.sockets){const marker=new THREE.AxesHelper(size*.6);marker.position.fromArray(socket.world_position_mm??socket.position_mm);body.add(marker)}}}
   // Print pose matches the exporter: static XYZ Euler (trimesh 'sxyz'), centered in X/Y, resting on Z=0.
   if(pose==='print'&&state.isolated){const [x,y,z]=l.rotation.map(THREE.MathUtils.degToRad);body.rotation.set(x,y,z,'ZYX')}
   return holder;
@@ -70,6 +85,7 @@ function rebuild(refit:boolean){
   const place=(pane:Pane,loaded:Map<string,Loaded>|undefined,run:Run|undefined,ghost=false)=>{const out=new Map<string,THREE.Group>();
     for(const n of names){const l=loaded?.get(n);if(l){const o=partObject(l,ghost,run);pane.root.add(o);out.set(n,o)}}return out};
   const objsA=place(a,loadedA,runA),objsB=b?place(b,loadedB,runB):runB&&mode==='overlay'?place(a,loadedB,runB,true):new Map<string,THREE.Group>();
+  if(runB&&checked('normalize')){const ba=new THREE.Box3(),bb=new THREE.Box3();for(const o of objsA.values())ba.expandByObject(o);for(const o of objsB.values())bb.expandByObject(o);const ratio=ba.getSize(new THREE.Vector3()).length()/bb.getSize(new THREE.Vector3()).length();if(Number.isFinite(ratio)&&ratio>0)for(const o of objsB.values())o.scale.setScalar(ratio)}
   if(state.isolated){
     // A fresh scene for the selection: recentre so each part is inspected on its own ground, not at its assembly position.
     const boxOf=(o?:THREE.Object3D)=>o?new THREE.Box3().setFromObject(o,pose==='print'):new THREE.Box3();
@@ -87,8 +103,8 @@ function rebuild(refit:boolean){
 function applyState(){
   for(const pane of viewer.panes)for(const holder of pane.root.children){const name=holder.userData.part as string;
     holder.visible=!!state.isolated||!state.hidden.has(name);
-    holder.traverse(o=>{const m=o as THREE.Mesh;if(!m.isMesh||m.userData.ghost)return;const mat=m.material as THREE.MeshStandardMaterial;
-      const selected=state.selection.has(name);mat.emissive.set(selected?0x2fb894:hovered===name?0x4a6a80:0x000000);mat.emissiveIntensity=selected?.45:.35})}
+    holder.traverse(o=>{const m=o as THREE.Mesh;if(!m.isMesh||m.userData.ghost)return;const materials=(Array.isArray(m.material)?m.material:[m.material]) as THREE.MeshStandardMaterial[];
+      const selected=state.selection.has(name);for(const mat of materials){mat.userData.baseEmissive??=mat.emissive.clone();mat.emissive.copy(selected?new THREE.Color(0x2fb894):hovered===name?new THREE.Color(0x4a6a80):mat.userData.baseEmissive);mat.emissiveIntensity=selected?.45:1}})}
 }
 
 function updateDimensions(){
@@ -113,7 +129,7 @@ function stopCompareButton(){const b=el('button',{class:'icon ghost',title:'Stop
 async function loadView(refit=true){
   const rev=++revision,backend=backendName(),progress=$('progress');
   const show=(done:number,total:number)=>{if(rev!==revision)return;progress.hidden=done>=total;progress.textContent=`Loading parts ${done}/${total}`};
-  const a=runA?.backends[backend],b=runB?.backends[backend];
+  const a=activeBackend(runA),b=activeBackend(runB,true);
   const [la,lb]=await Promise.all([a?loadParts(a,show):Promise.resolve(new Map<string,Loaded>()),b?loadParts(b,()=>{}):Promise.resolve(undefined)]);
   if(rev!==revision)return;progress.hidden=true;loadedA=la;loadedB=lb;
   for(const set of [state.selection,state.hidden])for(const n of [...set])if(!loadedA.has(n))set.delete(n);
@@ -124,7 +140,11 @@ async function loadView(refit=true){
 async function openRun(run:Run){
   runA=run;if(runB?.id===run.id)runB=undefined;
   const sel=$('backend') as HTMLSelectElement,previous=sel.value;
-  sel.replaceChildren(...Object.keys(run.backends).map(b=>el('option',{value:b,textContent:b})));if(run.backends[previous])sel.value=previous;
+  const route=$('target') as HTMLSelectElement,oldTarget=route.value,available=Object.keys(run.targets??{print:{}}).filter(t=>t!=='design'||!run.targets?.game&&!run.targets?.print);
+  route.replaceChildren(...available.map(t=>el('option',{value:t,textContent:t})));route.value=available.includes(oldTarget)?oldTarget:available.includes('game')?'game':available[0]??'print';
+  const other=$('compare-target') as HTMLSelectElement;other.replaceChildren(...['Same representation','print','game'].map(t=>el('option',{value:t==='Same representation'?'':t,textContent:t})));other.value='';
+  const backends=run.targets?.[route.value]?.backends??run.backends;
+  sel.replaceChildren(...Object.keys(backends).map(b=>el('option',{value:b,textContent:b})));if(backends[previous])sel.value=previous;
   await loadView();
 }
 async function setCompare(run:Run|undefined){runB=run;await loadView(false);if(run)toast(`Comparing B ${shortId(run.id)} with A ${shortId(runA!.id)}`)}
@@ -143,16 +163,17 @@ function renderPartsPanel(){
     bar.append(el('span',{textContent:n===1?names[0]:`${n} selected`,title:names.join(', ')}),
       button('Isolate',()=>isolate(names),'small primary'),button('Hide',()=>setHidden(names,true),'small'),button('Clear',()=>select([],'replace'),'small ghost'))}
 }
-function renderRunsPanel(){renderRuns($('runs'),runs,runA,runB,ctx?.safe_point??null,{open:r=>void openRun(r).catch(e=>toast(String(e))),compare:r=>void setCompare(r).catch(e=>toast(String(e)))});$('runs-count').textContent=String(runs.length)}
+function renderRunsPanel(){renderRuns($('runs'),runs,runA,runB,safePoint()??null,{open:r=>void openRun(r).catch(e=>toast(String(e))),compare:r=>void setCompare(r).catch(e=>toast(String(e)))});$('runs-count').textContent=String(runs.length)}
 
 function renderToolbar(){
   $('run-chip').replaceChildren(...(runA?[el('b',{textContent:'A'}),el('span',{textContent:runTime(runA.id)}),el('span',{class:'pill '+runA.status,textContent:runA.status+(runA.id===ctx?.safe_point?' · safe point':'')})]:[]));
-  ($('safe') as HTMLButtonElement).hidden=!ctx?.safe_point||ctx.safe_point===runA?.id;
+  ($('safe') as HTMLButtonElement).hidden=!safePoint()||safePoint()===runA?.id;
   const crumbs=$('crumbs');crumbs.replaceChildren();
   if(state.isolated){const iso=state.isolated;crumbs.append(button('‹ Assembly',exitIsolate,'small ghost crumb-back'),el('span',{class:'sep',textContent:'›'}),
     el('strong',{textContent:iso.length===1?iso[0]:groupLabel(iso),title:iso.join(', ')}))}
   else crumbs.append(el('strong',{textContent:'Assembly'}));
-  $('pose').hidden=!state.isolated;$('compare-mode').hidden=!runB;
+  $('pose').hidden=!state.isolated||targetName()==='game';$('compare-mode').hidden=!runB;
+  $('route-toolbar').hidden=!runA?.targets;$('game-tools').hidden=targetName()!=='game';
   $('colour-mode').hidden=!filamentPlan(runA).length&&![...loadedA.values()].some(l=>l.filaments.some(f=>f!==1));
   $('colour-mode').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.colour===colourMode));
   $('pose').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.pose===pose));
@@ -178,14 +199,15 @@ function renderDetails(){
   const dims=(x?:number[])=>x?x.map(v=>fmt(v)).join(' × ')+' mm':'—';
   const delta=(x?:number,y?:number,unit='')=>x===undefined||y===undefined?'':Math.abs(y-x)<.05?'=':`${y>x?'+':''}${(y-x).toFixed(1)}${unit}`;
   const table=el('table',{class:'measure'},el('thead',{},el('tr',{},el('th'),el('th',{textContent:runB?'A':'This run'}),...(runB?[el('th',{textContent:'B'}),el('th',{textContent:'Δ B−A'})]:[]))),
-    el('tbody',{},row('Print bbox',dims(m.bbox_mm),b?dims(mb?.bbox_mm):'not in B',m.bbox_mm&&mb?.bbox_mm?m.bbox_mm.map((v,i)=>delta(v,mb.bbox_mm![i])).join(' / '):''),
+    el('tbody',{},row(targetName()==='game'?'Asset bbox':'Print bbox',dims(m.bbox_mm),b?dims(mb?.bbox_mm):'not in B',m.bbox_mm&&mb?.bbox_mm?m.bbox_mm.map((v,i)=>delta(v,mb.bbox_mm![i])).join(' / '):''),
       row('Volume',m.volume_mm3!==undefined?`${(m.volume_mm3/1000).toFixed(2)} cm³`:'—',mb?.volume_mm3!==undefined?`${(mb.volume_mm3/1000).toFixed(2)} cm³`:b?'—':'not in B',delta(m.volume_mm3&&m.volume_mm3/1000,mb?.volume_mm3&&mb.volume_mm3/1000,' cm³')),
       row('Geometry',a.part.reused?'reused':'built in this run',b?(sha(a)===sha(b)?'identical':'changed'):'—')));
   const checks=el('div',{class:'pills'},...Object.entries(m.checks??{}).sort(([,x],[,y])=>Number(x)-Number(y)).map(([k,v])=>el('span',{class:'pill '+(v?'passed':'failed'),textContent:`${v?'✓':'✕'} ${k.replaceAll('_',' ')}`})));
   const previews:Item[]=[];const pa=find(a.part,'preview.png');if(pa)previews.push({path:pa.path,title:`${name} · A`,subtitle:runLabel(runA!),kind:'image'});
   const pb=find(b?.part,'preview.png');if(pb&&runB)previews.push({path:pb.path,title:`${name} · B`,subtitle:runLabel(runB),kind:'image'});
   const thumbs=el('div',{class:'detail-thumbs'},...previews.map((p,i)=>thumb(p,()=>openLightbox(previews,i))));
-  const files=el('div',{class:'files'},...a.part.artifacts.filter(x=>/\.(stl|3mf)$/.test(x.path)).map(x=>downloadLink(x.path,`⤓ ${fileName(x.path)}`)));
+  if(m.triangles!==undefined)table.querySelector('tbody')!.append(row('Triangles',String(m.triangles)),row('Material slots',String(m.materials??0)));
+  const files=el('div',{class:'files'},...a.part.artifacts.filter(x=>/\.(stl|3mf|fbx|glb)$/.test(x.path)).map(x=>downloadLink(x.path,`⤓ ${fileName(x.path)}`)));
   const actions=el('div',{class:'actions'});if(!state.isolated)actions.append(button('Isolate',()=>isolate([name]),'small primary'));else actions.append(button('‹ Back to assembly',exitIsolate,'small'));
   host.replaceChildren(el('div',{class:'details-head'},el('h2',{},name,el('span',{class:'muted',textContent:` · ${backendName()}`})),actions),
     el('div',{class:'details-body'},thumbs,el('div',{},table,checks,files)));
@@ -198,27 +220,39 @@ function button(text:string,fn:()=>void,cls=''){const b=el('button',{textContent
 function renderRenders(){
   const filter=state.isolated??(state.selection.size?[...state.selection]:null);
   const items:Item[]=[...loadedA.values()].filter(l=>!filter||filter.includes(l.name)).flatMap(l=>{const p=find(l.part,'preview.png');return p?[{path:p.path,title:l.name,subtitle:`${backendName()} · ${runLabel(runA!)}`,kind:'image' as const}]:[]});
+  const game=activeBackend(runA)?.game;
+  const reviewed=game?importEvidence.find(i=>i.package_id===game.package_id&&i.backend===backendName()&&i.status==='passed'&&i.review):undefined;
+  if(reviewed?.review&&!filter)items.unshift({path:reviewed.review.screenshot,title:'Unreal assembly review',subtitle:reviewed.id,kind:'image'});
   $('renders-note').textContent=filter?`· ${items.length} for the selection`:items.length?`· ${items.length}`:'';
   $('renders').replaceChildren(...(items.length?items.map((it,i)=>thumb(it,()=>openLightbox(items,i))):[el('p',{class:'muted',textContent:'No renders in this run.'})]));
 }
 
 function renderEvidence(){
-  const backend=runA?.backends[backendName()];$('errors').textContent=runA?.failures.join('\n')||'';
+  const backend=activeBackend(runA);$('errors').textContent=(runA?.targets?.[targetName()]?.failures??runA?.failures)?.join('\n')||'';
   const checks=Object.entries(backend?.checks??{}).sort(([,x],[,y])=>Number(x.passed)-Number(y.passed));
   $('checks').replaceChildren(...(checks.length?checks.map(([name,r])=>el('div',{class:'check '+(r.passed?'passed':'failed')},el('span',{class:'pill '+(r.passed?'passed':'failed'),textContent:r.passed?'✓ pass':'✕ fail'}),el('span',{textContent:name}),el('span',{class:'tag',textContent:r.reused?'reused evidence':'fresh check'}))):[el('p',{class:'muted',textContent:runA?'No checks recorded for this backend.':'No run selected.'})]));
   const host=$('artifacts');host.replaceChildren();if(!runA||!backend)return;const b=backendName();
-  const log=`.geometryforge/runs/${runA.id}/${b}/${b}.log`;
+  const log=`.geometryforge/runs/${runA.id}/${runA.targets?targetName()+'/':''}${b}/${b}.log`;
   const scene=el('div',{class:'files'});if(backend.native)scene.append(downloadLink(backend.native.path,`⤓ Editable native scene (${fileName(backend.native.path)})`));
   scene.append(button('View backend log',()=>openLightbox([{path:log,title:`${b}.log`,subtitle:runLabel(runA!),kind:'text'}]),'small'));
   renderKit(host,backend.kit);
+  if(backend.game){
+    const imported=importEvidence.find(i=>i.package_id===backend.game!.package_id&&i.backend===b&&i.status==='passed');
+    $('checks').prepend(el('div',{class:'pills'},el('span',{class:'pill passed',textContent:'Package safe'}),el('span',{class:'pill '+(imported?'passed':'candidate'),textContent:imported?'Unreal verified':'Unreal not verified'})));
+    host.append(el('h3',{textContent:'Game package'}),el('div',{class:'files'},...backend.game.artifacts.filter(a=>/\.(zip|fbx|glb)$/.test(a.path)).map(a=>downloadLink(a.path,'⤓ '+fileName(a.path)))));
+    const notes=runA.targets?.game?.settings?.conversion_notes??[];
+    if(notes.length)host.append(el('p',{class:'muted',textContent:notes.join(' ')}));
+    if(imported)host.append(button('View Unreal verification',()=>openLightbox([{path:`.geometryforge/imports/${imported.id}/import.json`,title:'Unreal verification',subtitle:imported.id,kind:'text'}]),'small'));
+    if(imported?.review)host.append(el('div',{class:'files'},...imported.review.profiler_csv.map(path=>downloadLink(path,'⤓ Editor profiler CSV'))));
+  }
   host.append(el('h3',{textContent:'Scene & logs'}),scene);
   const filter=state.isolated??(state.selection.size?[...state.selection]:null);
   const parts=[...loadedA.values()].filter(l=>!filter||filter.includes(l.name));
   $('files-note').textContent=filter?`· ${parts.length} selected part${parts.length===1?'':'s'}`:'';
-  const table=el('table',{class:'files-table'},el('thead',{},el('tr',{},el('th',{textContent:'Part'}),el('th',{textContent:'Print files'}),el('th',{textContent:'Render'}))),
+  const table=el('table',{class:'files-table'},el('thead',{},el('tr',{},el('th',{textContent:'Part'}),el('th',{textContent:backend.game?'Game files':'Print files'}),el('th',{textContent:'Render'}))),
     el('tbody',{},...parts.map(l=>{const png=find(l.part,'preview.png');const view=png?button('View',()=>openLightbox([{path:png.path,title:l.name,subtitle:runLabel(runA!),kind:'image'}]),'small ghost'):'—';
-      return el('tr',{},el('td',{textContent:l.name}),el('td',{},...l.part.artifacts.filter(x=>/\.(stl|3mf)$/.test(x.path)).map(x=>downloadLink(x.path,'⤓ '+fileName(x.path).split('.').pop()!.toUpperCase()))),el('td',{},view))})));
-  host.append(el('h3',{textContent:'Print files'}),table);
+      return el('tr',{},el('td',{textContent:l.name}),el('td',{},...l.part.artifacts.filter(x=>/\.(stl|3mf|fbx|glb)$/.test(x.path)).map(x=>downloadLink(x.path,'⤓ '+fileName(x.path).split('.').pop()!.toUpperCase()))),el('td',{},view))})));
+  host.append(el('h3',{textContent:backend.game?'Game files':'Print files'}),table);
 }
 
 // Whole-model deliverables: the Bambu project with plates, the assembled model, and the slicer-neutral files.
@@ -284,17 +318,22 @@ $('colour-mode').querySelectorAll('button').forEach(b=>(b as HTMLButtonElement).
 $('pose').querySelectorAll('button').forEach(b=>(b as HTMLButtonElement).onclick=()=>{pose=(b as HTMLButtonElement).dataset.pose as typeof pose;rebuild(true);renderToolbar()});
 $('compare-mode').querySelectorAll('button').forEach(b=>(b as HTMLButtonElement).onclick=()=>{mode=(b as HTMLButtonElement).dataset.mode as typeof mode;rebuild(false);renderToolbar()});
 $('backend').onchange=guarded(()=>loadView());$('fit').onclick=()=>viewer.fit();
-$('safe').onclick=()=>{const run=runs.find(r=>r.id===ctx?.safe_point);if(run)void openRun(run).catch(e=>toast(String(e)))};
+for(const id of ['wireframe','collision','pivots','lod','normalize'])$(id).onchange=()=>rebuild(false);
+$('target').onchange=guarded(async()=>{pose='assembly';state.isolated=null;const select=$('backend') as HTMLSelectElement;const names=Object.keys(runA?.targets?.[targetName()]?.backends??{});const previous=select.value;select.replaceChildren(...names.map(n=>el('option',{value:n,textContent:n})));if(names.includes(previous))select.value=previous;await loadView()});
+$('compare-target').onchange=guarded(async()=>{const target=compareTargetName();const candidate=runB?.targets?.[target]?runB:runA?.targets?.[target]?runA:runs.find(r=>r.targets?.[target]?.status==='passed');if(candidate)await setCompare(candidate);else toast('No retained run contains that representation')});
+$('safe').onclick=()=>{const run=runs.find(r=>r.id===safePoint());if(run)void openRun(run).catch(e=>toast(String(e)))};
 
 // ---------- Projects ----------
 async function refreshProjects(){projects=await api('/projects');$('projects').replaceChildren();for(const [id,p] of Object.entries(projects)){if(p.archived&&!($('show-archived') as HTMLInputElement).checked)continue;const b=button(p.title,()=>void openProject(id).catch(e=>toast(String(e))),'project '+(id===session.key?'active':''));b.title=p.path;$('projects').append(b)}}
 async function openProject(id:string){
-  revision++;clearCache();session.key=id;runA=runB=undefined;loadedA=new Map();loadedB=undefined;state.selection.clear();state.hidden.clear();state.isolated=null;state.filter='';($('part-filter') as HTMLInputElement).value='';
+  ($('target') as HTMLSelectElement).replaceChildren();($('compare-target') as HTMLSelectElement).replaceChildren();
+  pose='assembly';($('lod') as HTMLSelectElement).value='0';for(const id of ['wireframe','collision','pivots','normalize'])($ (id) as HTMLInputElement).checked=false;
+  revision++;clearCache();clearGameTextures();session.key=id;runA=runB=undefined;loadedA=new Map();loadedB=undefined;state.selection.clear();state.hidden.clear();state.isolated=null;state.filter='';($('part-filter') as HTMLInputElement).value='';
   viewer.setPanes([]);$('overlays').replaceChildren();$('title').textContent=projects[id].title;$('path').textContent=projects[id].path;renderAll();
   await refreshProjects();await refresh();const start=runs.find(r=>r.id===ctx?.safe_point)??runs[0];if(start)await openRun(start);else $('empty').hidden=false;
 }
 async function refresh(){
-  if(!session.key)return;const requested=session.key;const result=await Promise.all([api(`/projects/${requested}/context`),api(`/projects/${requested}/runs`)]);if(session.key!==requested)return;[ctx,runs]=result;
+  if(!session.key)return;const requested=session.key;const result=await Promise.all([api(`/projects/${requested}/context`),api(`/projects/${requested}/runs`),api(`/projects/${requested}/imports`)]);if(session.key!==requested)return;[ctx,runs,importEvidence]=result;
   const stale=Object.values(ctx!.backends).some(s=>s.stale||s.working_changed);
   $('banner').textContent=ctx!.safe_point_label+' · '+Object.entries(ctx!.backends).map(([b,s])=>`${b}: ${s.stale?'out of date':'current'}${s.working_changed?' (saved edits detected)':''}`).join(' · ');
   $('banner').className='pill banner '+(ctx!.safe_point?stale?'warn':'passed':'candidate');

@@ -72,14 +72,19 @@ def create_app():
             result.append(data)
         return result
 
+    @app.get('/api/projects/{key}/imports')
+    def imports(key: str):
+        root=project(key)
+        return [read(file) for file in sorted((root/'.geometryforge/imports').glob('*/import.json'),reverse=True)]
+
     @app.get('/api/projects/{key}/artifact')
     def download(key: str, path: str, inline: bool = False):
         root=project(key)
         target=inside(root,path)
         # Only retained run artifacts can be served, never arbitrary source files.
-        if not target.is_relative_to((root/'.geometryforge/runs').resolve()) or not target.is_file():
+        if not any(target.is_relative_to((root/'.geometryforge'/folder).resolve()) for folder in ('runs','imports')) or not target.is_file():
             raise HTTPException(404,'Artifact not found')
-        if target.suffix not in ('.json','.png','.stl','.3mf','.blend','.hip','.hipnc','.hiplc','.log'):
+        if target.suffix.lower() not in ('.json','.png','.jpg','.jpeg','.stl','.3mf','.blend','.hip','.hipnc','.hiplc','.log','.fbx','.glb','.zip','.csv'):
             raise HTTPException(404,'Unsupported artifact type')
         # inline lets the viewer show images and logs in place; downloads stay the default.
         return FileResponse(target,filename=target.name,content_disposition_type='inline' if inline else 'attachment')

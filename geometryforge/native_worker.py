@@ -1,11 +1,19 @@
 """Native workers. Loaded in Blender Python or Houdini's owned GUI session."""
 import importlib
+import importlib.util
 import json
 from pathlib import Path
 import runpy
 import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+# Load only this package. In a wheel its parent is host site-packages, whose
+# compiled dependencies may target a different Python ABI from Blender/Houdini.
+if 'geometryforge' not in sys.modules:
+    package_dir=Path(__file__).resolve().parent
+    package_spec=importlib.util.spec_from_file_location('geometryforge',package_dir/'__init__.py',submodule_search_locations=[str(package_dir)])
+    package_module=importlib.util.module_from_spec(package_spec)
+    sys.modules['geometryforge']=package_module
+    package_spec.loader.exec_module(package_module)
 
 def recipe(request, api):
     entry = Path(request["entry"])
@@ -24,6 +32,14 @@ def recipe(request, api):
                 else:
                     del sys.modules[name]
 
+
+def preparation(request, api):
+    """Explicit stage recipes only; verify never executes preparation builders."""
+    for name, stage in request.get('stages', {}).items():
+        if stage.get('run'):
+            stage_request = {**request, 'entry': str(Path(request['snapshot_root']) / stage['entry']), 'parts': stage['parts']}
+            recipe(stage_request, api)
+
 def blender_execute(request):
     import bpy
     from geometryforge import native_api
@@ -33,22 +49,40 @@ def blender_execute(request):
         bpy.ops.wm.open_mainfile(filepath=request["source"])
     else:
         initialize()
-    api = native_api.Blender()
+    api = native_api.Blender(request)
     if request["parts"]:
         recipe(request, api)
-    objects = meshes()
+    preparation(request, api)
+    target = request.get('target', 'print')
+    if target != 'print':
+        from geometryforge.blender_game import meshes, relocate_textures
+        relocate_textures(Path(request['out']) / 'native-textures')
+        objects = meshes(target)
+    else:
+        objects = meshes()
     out = Path(request["out"])
     scene = out / "model.blend"
     bpy.context.preferences.filepaths.save_version = 0
-    bpy.ops.wm.save_as_mainfile(filepath=str(scene))
+    bpy.ops.wm.save_as_mainfile(filepath=str(scene),relative_remap=False)
     # Reopen the actual delivered scene to verify persistence of native structures.
     bpy.ops.wm.open_mainfile(filepath=str(scene))
-    reopened = meshes()
+    reopened = meshes(target) if target != 'print' else meshes()
     from geometryforge.engine import geometry_hash
-    if geometry_hash(reopened) != geometry_hash(objects):
+    from geometryforge.storage import fingerprint
+    hash_geometry = fingerprint if target != 'print' else geometry_hash
+    from geometryforge.blender_game import equivalent
+    matches = equivalent(reopened, objects) if target != 'print' else hash_geometry(reopened) == hash_geometry(objects)
+    if not matches:
+        (out / 'before-reopen.json').write_text(json.dumps(objects), encoding='utf-8')
+        (out / 'after-reopen.json').write_text(json.dumps(reopened), encoding='utf-8')
         raise ValueError('Native geometry changed after reopening the saved Blender file')
     result = {"version": bpy.app.version_string, "scene": str(scene), "objects": objects,
               "native_objects": len(bpy.data.objects), "modifiers": sum(len(o.modifiers) for o in bpy.data.objects)}
+    if target != 'print':
+        result['objects'] = reopened
+    if target == 'game':
+        from geometryforge.blender_game import export_fbx
+        result['mesh_exports'] = export_fbx(reopened, out / 'native-fbx',request.get('previous_mesh_exports'),request.get('full',False))
     (out / "result.json").write_text(json.dumps(result), encoding="utf-8")
 
 def houdini_execute(request, cancelled):
@@ -68,13 +102,23 @@ def houdini_execute(request, cancelled):
         houdini_scene.initialize()
     houdini_scene.PARTS.clear()
     if request["parts"]:
-        recipe(request, native_api.Houdini())
+        recipe(request, native_api.Houdini(request))
+    preparation(request, native_api.Houdini(request))
     if cancelled():
         raise RuntimeError('Cancelled')
     out = Path(request['out'])
     scene = out / ('model' + scene_suffix())
     hou.hipFile.save(str(scene))
     hou.hipFile.load(str(scene), suppress_save_prompt=True, ignore_load_warnings=True)
+    if request.get('target', 'print') != 'print':
+        from geometryforge.houdini_game import extract, export_fbx
+        objects = extract(request.get('target', 'game'))
+        result = {**{'version': hou.applicationVersionString(), 'license': str(hou.licenseCategory()), 'scene': str(scene)},
+                  'objects': objects, 'native_nodes': len(hou.node('/obj/geometryforge').allSubChildren())}
+        if request['target'] == 'game':
+            result['mesh_exports'] = export_fbx(objects, out / 'native-fbx')
+        (out / 'result.json').write_text(json.dumps(result), encoding='utf-8')
+        return {'scene': str(scene), 'version': result['version'], 'license': result['license']}
     export_geometry(out, cancelled)
     inventory = json.loads((out / 'houdini_geometry.json').read_text())
     # Read supported OBJ interchange in the host, avoiding host hou/bpy dependencies.

@@ -6,6 +6,25 @@ const project=(page:Page,name:string)=>page.locator('#projects .project').filter
 const leaves=(page:Page)=>page.locator('#parts .part-row');
 async function openLander(page:Page){await page.goto('/');await project(page,'Fixture Lander').click();await expect(leaves(page)).toHaveCount(6,{timeout:30000})}
 
+test('game representations, PBR textures, LOD/collision and downloads',async({page},testInfo)=>{
+  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  const textureResponses:string[]=[];page.on('response',r=>{if(r.url().includes('textures')&&r.status()===200)textureResponses.push(r.url())});
+  await page.goto('/');await project(page,'Fixture Game').click();
+  await expect(leaves(page)).toHaveCount(1,{timeout:30000});
+  await expect(page.locator('#target')).toHaveValue('game');
+  await expect(page.locator('#checks')).toContainText('Package safe');
+  await expect(page.locator('#checks')).toContainText('Unreal not verified');
+  await expect(page.locator('#artifacts')).toContainText('asset-package.zip');
+  await expect.poll(()=>textureResponses.length).toBeGreaterThan(0);
+  await page.locator('#wireframe').check();await page.locator('#collision').check();await page.locator('#pivots').check();
+  await page.locator('#lod').selectOption('2');await page.locator('#lod').selectOption('0');await page.locator('#wireframe').uncheck();
+  await page.screenshot({path:testInfo.outputPath('game-view.png')});
+  await page.locator('#target').selectOption('print');await expect(page.locator('#artifacts')).toContainText('Print files');
+  await page.locator('#target').selectOption('game');await page.locator('#compare-target').selectOption('print');
+  await expect(page.locator('#compare-mode')).toBeVisible();await page.locator('#normalize').check();
+  expect(errors).toEqual([]);
+});
+
 test('projects, assemblies, backends and evidence',async({page})=>{
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('/');

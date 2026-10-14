@@ -1,15 +1,19 @@
 import * as THREE from 'three';
 
 export type Artifact={path:string;sha256:string};
-export type Measurements={bbox_mm?:number[];volume_mm3?:number;bed_mm?:number[];checks?:Record<string,boolean>};
+export type Measurements={bbox_mm?:number[];volume_mm3?:number;bed_mm?:number[];checks?:Record<string,boolean>;triangles?:number;materials?:number};
 export type Part={reused:boolean;artifacts:Artifact[];measurements?:Measurements};
 export type Filament={slot:number;name?:string;colour:string;material?:string;preset?:string;used_for?:string};
 export type Kit={artifacts:Artifact[];parts:Record<string,number[]>;filaments:Record<string,Filament>;bambu?:{skipped?:string;machine?:string;process?:string;files?:Record<string,{plates:number;instances:number}>}};
-export type Backend={parts:Record<string,Part>;checks:Record<string,{passed:boolean;reused:boolean}>;native?:Artifact;changed_parts:string[];rebuilt_parts:string[];kit?:Kit};
-export type Run={id:string;parent:string|null;status:string;backends:Record<string,Backend>;failures:string[];decisions?:{print?:{filaments?:Filament[]}}};
+export type Material={id:string;base_color?:number[];roughness?:number;metallic?:number;blend_mode?:string;textures:Record<string,{path:string;preview_path?:string;color_space:string}>};
+export type Backend={parts:Record<string,Part>;checks:Record<string,{passed:boolean;reused:boolean}>;native?:Artifact;changed_parts:string[];rebuilt_parts:string[];kit?:Kit;target?:string;game?:{manifest:string;package_id:string;package_safe:boolean;materials:Record<string,Material>;artifacts:Artifact[]}};
+export type Target={status:string;backends:Record<string,Backend>;failures:string[];settings?:{profile?:string;conversion_notes?:string[]}};
+export type Run={id:string;parent:string|null;status:string;backends:Record<string,Backend>;targets?:Record<string,Target>;failures:string[];decisions?:{print?:{filaments?:Filament[]}}};
 export type Project={path:string;title:string;archived:boolean};
-export type Context={safe_point:string|null;safe_point_label:string;issues:string[];backends:Record<string,{stale:boolean;working_changed:boolean}>};
-export type Loaded={name:string;part:Part;geometries:THREE.BufferGeometry[];filaments:number[];rotation:number[]};
+export type Context={safe_point:string|null;safe_point_label:string;issues:string[];backends:Record<string,{stale:boolean;working_changed:boolean}>;targets?:Record<string,{safe_point:string|null;stale:boolean}>;unreal?:{safe_import?:string}};
+export type ImportEvidence={id:string;run:string;backend:string;status:string;package_id:string;coverage?:{commandlet?:boolean;rendered_review?:boolean;performance_measured?:boolean};review?:{screenshot:string;profiler_csv:string[]};failures:string[]};
+export type MeshInfo={role:string;lod:number;materialIds:string[];pivot:number[];sockets:{name:string;position_mm:number[];world_position_mm?:number[]}[]};
+export type Loaded={name:string;part:Part;geometries:THREE.BufferGeometry[];filaments:number[];rotation:number[];meshInfo:MeshInfo[];game?:Backend['game']};
 
 let token='';
 export const session={key:''};
@@ -27,15 +31,27 @@ export const find=(part:Part|undefined,suffix:string)=>part?.artifacts.find(a=>a
 export const natural=new Intl.Collator(undefined,{numeric:true}).compare;
 
 // Geometry is cached per artifact URL: switching runs, backends or views never re-downloads a part.
-const geometryCache=new Map<string,Promise<{geometries:THREE.BufferGeometry[];filaments:number[];rotation:number[]}>>();
+const geometryCache=new Map<string,Promise<{geometries:THREE.BufferGeometry[];filaments:number[];rotation:number[];meshInfo:MeshInfo[]}>>();
 export function clearCache(){for(const entry of geometryCache.values())void entry.then(e=>e.geometries.forEach(g=>g.dispose()),()=>{});geometryCache.clear()}
 function geometry(path:string){
   const url=artifactURL(path);let entry=geometryCache.get(url);
   if(!entry){
     entry=fetch(url).then(r=>{if(!r.ok)throw Error(`Could not load ${fileName(path)}`);return r.json()}).then(data=>{
-      const objects:{vertices:number[][];faces:number[][];print_rotation_deg?:number[];filament?:number}[]=data.objects;
-      const geometries=objects.map(obj=>{const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(obj.vertices.flat(),3));g.setIndex(obj.faces.flat());g.computeVertexNormals();g.computeBoundingBox();return g});
-      return {geometries,filaments:objects.map(o=>o.filament??1),rotation:objects[0]?.print_rotation_deg??[0,0,0]};
+      type Evidence={vertices:number[][];faces:number[][];print_rotation_deg?:number[];filament?:number;role?:string;uv_layers?:Record<string,number[][][]>;corner_normals?:number[][][];corner_tangents?:number[][][];face_materials?:number[];materials?:{id:string}[];matrix_world?:number[][];metadata?:{lod?:number;sockets?:MeshInfo['sockets']}};
+      const objects:Evidence[]=data.objects;
+      const geometries=objects.map(obj=>{const g=new THREE.BufferGeometry();
+        if(obj.role&&obj.corner_normals?.length){
+          const order=obj.faces.map((_,i)=>i).sort((a,b)=>(obj.face_materials?.[a]??0)-(obj.face_materials?.[b]??0));
+          g.setAttribute('position',new THREE.Float32BufferAttribute(order.flatMap(index=>obj.faces[index].flatMap(i=>obj.vertices[i])),3));
+          g.setAttribute('normal',new THREE.Float32BufferAttribute(order.flatMap(i=>obj.corner_normals![i].flat()),3));
+          const uv=Object.values(obj.uv_layers??{})[0];if(uv)g.setAttribute('uv',new THREE.Float32BufferAttribute(order.flatMap(i=>uv[i].flat()),2));
+          if(obj.corner_tangents?.length)g.setAttribute('tangent',new THREE.Float32BufferAttribute(order.flatMap(i=>obj.corner_tangents![i].flat()),4));
+          let start=0;for(let i=0;i<=order.length;i++){if(i===order.length||(obj.face_materials?.[order[i]]??0)!==(obj.face_materials?.[order[start]]??0)){g.addGroup(start*3,(i-start)*3,obj.face_materials?.[order[start]]??0);start=i}}
+          if(obj.matrix_world)g.applyMatrix4(new THREE.Matrix4().set(...obj.matrix_world.flat() as Parameters<THREE.Matrix4['set']>));
+        }else{g.setAttribute('position',new THREE.Float32BufferAttribute(obj.vertices.flat(),3));g.setIndex(obj.faces.flat());g.computeVertexNormals()}
+        g.computeBoundingBox();return g});
+      const meshInfo=objects.map(obj=>{const matrix=obj.matrix_world?new THREE.Matrix4().set(...obj.matrix_world.flat() as Parameters<THREE.Matrix4['set']>):new THREE.Matrix4();return {role:obj.role??'printable',lod:obj.metadata?.lod??0,materialIds:(obj.materials??[]).map(m=>m.id),pivot:obj.matrix_world?.map(r=>r[3]).slice(0,3)??[0,0,0],sockets:(obj.metadata?.sockets??[]).map(s=>({...s,world_position_mm:new THREE.Vector3().fromArray(s.position_mm).applyMatrix4(matrix).toArray()}))}});
+      return {geometries,filaments:objects.map(o=>o.filament??1),rotation:objects[0]?.print_rotation_deg??[0,0,0],meshInfo};
     });
     entry.catch(()=>geometryCache.delete(url));geometryCache.set(url,entry);
   }
@@ -46,7 +62,7 @@ export async function loadParts(backend:Backend,progress:(done:number,total:numb
   const names=Object.keys(backend.parts).sort(natural).filter(n=>find(backend.parts[n],'/assembly.json'));
   const result=new Map<string,Loaded>();let done=0,next=0;progress(0,names.length);
   const worker=async()=>{while(next<names.length){const name=names[next++];const part=backend.parts[name];
-    const {geometries,filaments,rotation}=await geometry(find(part,'/assembly.json')!.path);result.set(name,{name,part,geometries,filaments,rotation});progress(++done,names.length)}};
+    const {geometries,filaments,rotation,meshInfo}=await geometry(find(part,'/assembly.json')!.path);result.set(name,{name,part,geometries,filaments,rotation,meshInfo,game:backend.game});progress(++done,names.length)}};
   await Promise.all(Array.from({length:Math.min(6,names.length)},worker));
   return new Map(names.filter(n=>result.has(n)).map(n=>[n,result.get(n)!]));
 }

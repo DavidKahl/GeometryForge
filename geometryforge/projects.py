@@ -13,7 +13,7 @@ ID = re.compile(r"^[a-z][a-z0-9_]*$")
 def load(root):
     root = Path(root).resolve()
     config = tomllib.loads((root / "project.toml").read_text(encoding="utf-8"))
-    if config.get("format_version") != 1:
+    if config.get("format_version") not in (1, 2):
         raise ValueError("Unsupported GeometryForge project format")
     if not ID.fullmatch(config["project"]["id"]):
         raise ValueError("Invalid project ID")
@@ -34,18 +34,23 @@ def load(root):
     for backend, spec in config.get("backends", {}).items():
         if backend not in ("blender", "houdini") or not inside(root, spec["entry"]).is_file():
             raise ValueError(f"Invalid backend {backend}")
-    state = read(root / ".geometryforge/state.json", {"format_version": 1, "backends": {}, "latest_attempt": None, "safe_point": None, "issues": []})
-    if state.get("format_version") != 1:
+    state = read(root / ".geometryforge/state.json", {"format_version": config['format_version'], "backends": {}, "targets": {}, "safe_points": {}, "latest_attempt": None, "safe_point": None, "issues": []})
+    if state.get("format_version") not in (1, 2):
         raise ValueError("Unsupported state version")
     decisions = read(root / "decisions.json", {})
     params = read(root / "parameters.json", {})
     fingerprint(params)  # rejects nonfinite JSON values
     if decisions.get('units', 'mm') != 'mm':
         raise ValueError('GeometryForge project units must be mm')
-    bed = decisions.get('print', {}).get('bed_mm', [220,220,250])
-    if not isinstance(bed, list) or len(bed) not in (2,3) or any(type(v) not in (int,float) or not 0 < v < 100000 for v in bed):
-        raise ValueError('Print bed must have two or three positive finite dimensions')
-    return {"root": root, "config": config, "state": state, "decisions": decisions, "parameters": params}
+    p = {"root": root, "config": config, "state": state, "decisions": decisions, "parameters": params}
+    if config['format_version'] == 2:
+        from .targets import validate_contract
+        validate_contract(p)
+    if config['format_version'] == 1 or 'print' in decisions.get('output_targets', []):
+        bed = decisions.get('print', {}).get('bed_mm', [220,220,250])
+        if not isinstance(bed, list) or len(bed) not in (2,3) or any(type(v) not in (int,float) or not 0 < v < 100000 for v in bed):
+            raise ValueError('Print bed must have two or three positive finite dimensions')
+    return p
 
 def save_state(project):
     write(project["root"] / ".geometryforge/state.json", project["state"])
@@ -60,6 +65,9 @@ def inputs(project):
         names.update(spec.get("sources", []))
     for spec in project["config"].get("backends", {}).values():
         names.add(spec["entry"])
+    if project['config']['format_version'] == 2:
+        from .targets import declared_files
+        names.update(declared_files(project))
     return {name: digest(inside(root, name)) for name in sorted(names)}
 
 def closure(config, changed):
@@ -75,7 +83,7 @@ def part_inputs(project, name):
     return {"sources": {s: digest(inside(project["root"], s)) for s in spec.get("sources", [])},
             "parameters": {p: project["parameters"][p] for p in spec.get("parameters", [])}, "spec": spec}
 
-def initialize(destination, example=None, ident=None, deliverables="both", backend="blender", brief="", bed=(220,220,250)):
+def initialize(destination, example=None, ident=None, deliverables="both", backend="blender", brief="", bed=(220,220,250), target=None):
     destination = Path(destination).resolve()
     if destination.exists() and any(destination.iterdir()):
         raise ValueError("Initialize into an empty directory")
@@ -83,7 +91,7 @@ def initialize(destination, example=None, ident=None, deliverables="both", backe
     if not ID.fullmatch(ident):
         raise ValueError("Use a lowercase project ID with underscores")
     if example:
-        if example not in ("desk_organizer",):
+        if example not in ("desk_organizer", "mechanical_prop"):
             raise ValueError("Unknown example")
         shutil.copytree(PACKAGE / "examples" / example, destination, dirs_exist_ok=True)
         text = (destination / "project.toml").read_text(encoding="utf-8")
@@ -92,9 +100,23 @@ def initialize(destination, example=None, ident=None, deliverables="both", backe
         destination.mkdir(parents=True, exist_ok=True)
         (destination / "project.toml").write_text(f'format_version = 1\n[project]\nid = "{ident}"\ntitle = "{ident}"\n[parts]\n', encoding="utf-8")
         write(destination / "parameters.json", {})
-    write(destination / "decisions.json", {"brief": brief or ("Printable " + example.replace("_", " ") if example else ""),
+    decisions = {"brief": brief or (example.replace("_", " ") if example else ""),
           "intended_use": "3d printing", "units": "mm", "deliverables": deliverables, "execution_backend": backend,
-          "print": {"bed_mm": list(bed), "nozzle_mm": 0.4}, "unresolved": [] if example or brief else ["Define design brief and dimensions"]})
+          "print": {"bed_mm": list(bed), "nozzle_mm": 0.4}, "unresolved": [] if example or brief else ["Define design brief and dimensions"]}
+    if target is not None or example == 'mechanical_prop':
+        target = target or 'game'
+        if target not in ('print', 'game', 'both'):
+            raise ValueError('Unknown output target')
+        decisions.update(output_targets=['print', 'game'] if target == 'both' else [target],
+                         intended_use='game asset' if target == 'game' else 'game asset and/or printable object',
+                         game={'profile': 'unreal_desktop_standard'})
+        contract = destination / 'project.toml'
+        text = contract.read_text(encoding='utf-8').replace('format_version = 1', 'format_version = 2', 1)
+        if example != 'mechanical_prop':
+            for route in decisions['output_targets']:
+                text += f'\n[targets.{route}]\n'
+        contract.write_text(text, encoding='utf-8')
+    write(destination / 'decisions.json', decisions)
     (destination / "AGENTS.md").write_text("# Modeling this project\n\nUse the geometryforge skill. Start with `geometryforge context .`.\nKeep decisions in decisions.json and dimensions in parameters.json.\nPreserve working edits and safe points. Use `plan` before `run`.\n", encoding="utf-8")
     (destination / "CLAUDE.md").write_text("@AGENTS.md\n", encoding="utf-8")
     register(destination)

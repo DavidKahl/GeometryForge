@@ -22,6 +22,14 @@ Per-project OS locks serialize modifications. Atomic state/manifest writes preve
 
 Houdini uses a dedicated owned GUI process with authenticated JSON loopback requests, cooperative cancellation and recovery saves before scene replacement. Actual license capabilities determine native formats. Blender uses background subprocesses. Native modules are never imported into the host environment.
 
-## Viewer boundary
+## Independent v2 delivery routes
+
+v1 projects retain their original print behavior. The v2 target coordinator normalizes route contracts into the native engine, with independent working scenes/backend state, part/output mappings, preparation fingerprints and package safe points. Optional shared design precedes delivery; frozen cross-route derivation avoids cyclic live dependencies. Failure in one route cannot replace another route's safe point, and aggregate promotion requires every requested route/backend.
+
+Game extraction preserves per-corner shading/UV data, materials, asset-local transforms, collision/LOD roles and sockets. Print validation/3MF kits run only for the print target. Preparation stages are explicit agent-authored recipes; verification never invokes them or promotes changed-but-unapplied preparation. Stage dependencies isolate material, bake, LOD and collision work from source geometry. Retained textures are hashed and packaged; packed Blender images survive copied native scenes. Evidence hashes normalize relocated texture paths by content hash, and bounded native float32 recooking tolerance prevents cache churn while topology and identities remain exact. Frozen derivation does not depend on the latest live design scene.
+
+Game packages carry file hashes, native FBX read-back evidence, independently written/read GLBs and PBR conventions. Unreal is an optional editor-only adapter with its own import records/safe pointer and managed versioned namespaces. Saved-asset verification is independent of rendered review/performance. The viewer reads route/import evidence and serves game artifacts under the same retained-directory boundaries; it adds no execution endpoints.
+
+## Viewer access boundary
 
 FastAPI serves bundled offline assets and registered-project evidence. Metadata writes require a session token and same-origin requests; Host is restricted to loopback. Artifact paths must stay inside retained run directories, including resolved symlinks. Project code is not executed by browser endpoints.
