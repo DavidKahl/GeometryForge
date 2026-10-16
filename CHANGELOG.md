@@ -33,7 +33,9 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
-- **Panel corners stay sharp:** `build_guide_mesh_stack(corner_crease=1.0)` puts a vertex crease where a panel's outer border turns in the surface's tangent plane. Subdivision no longer rounds sparse panel corners over a long distance and opens seams toward their ends. Opening loops keep smooth corners.
+- **Panel corners stay sharp:** `tighten_panel_corners(panel, corner_mm)` adds support cuts beside each outer corner of a panel (turn measured in the surface's tangent plane), so subdivision keeps panel outlines straight and seams even to their ends. A vertex crease was tried first and flipped the solidified shell outward at acute corners.
+- **Rectangular openings:** `tighten_opening(panel, opening, corner_mm)` adds support cuts beside each plan corner of an opening rim, so openings sliced from one or two master faces stay rectangular instead of subdividing into ovals. Pocket rings slide their corner-adjacent vertices with the corner, so deeper rings keep the rim's corner shape instead of undercutting it. Corner distances that are too tight for the panel thickness fold the shell; the hover taxi uses 160 mm on windows.
+- **Panels keep the master's creases:** `slice_panel` no longer drops the master's edge creases, so panels subdivide to the master's limit surface and shrinkwrap only corrects small offsets (nacelle coverage misses fell from 1.37 m2 to 0.28 m2).
 - **Seam gap at the visible edge:** the skin border sits where the normal limit is crossed along the edge that runs most nearly across the border, independent of how coarse or skewed the subdivided strip is. Step and curvature still compare the flush skin vertices.
 - **Seam gap on staggered borders:** seam checks pair each border vertex with the nearest point on the other panel's border edges and measure the gap to that point. Coarse or differently subdivided borders no longer drop out of pairing or count their along-seam offset as gap. Border vertices whose gap vector runs along their own border (panel corners) are excluded.
 

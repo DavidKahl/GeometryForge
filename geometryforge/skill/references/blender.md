@@ -8,7 +8,8 @@ For compound curved reference geometry use [surface modeling](surface-modeling.m
 
 - `master_hull(name, verts, faces, regions, creases, levels=4)`: the hidden `guide` role object with a `gf_region` face attribute.
 - `slice_panel(guide, region, openings, name)`: conforms the panel cage onto the master and writes `gf_loop_<opening>` groups.
-- `inset_panel_perimeter(panel, distance, gap)` and `build_guide_mesh_stack(panel, guide, thickness, bevel_width, subsurf_levels)`.
+- `inset_panel_perimeter(panel, distance, gap)`, `tighten_panel_corners(panel, corner_mm)`, `tighten_opening(panel, opening, corner_mm)` and `build_guide_mesh_stack(panel, guide, thickness, bevel_width, subsurf_levels)`.
+- Toolkit helpers are not part inputs: after changing one, rebuild with `run --parts ...` (or `--full`). A plain run, even with `--source code`, re-evaluates the saved scene when no project input changed.
 - `recessed_pocket_extrude(panel, loop, depth, draft_angle_deg, fillet_mm)`: weights `guide_bound` and `gf_pocket`, and stores the pull axis.
 - `extract_interface_ring(obj, loop, name)` and `local_ring(name, radius)`: edge-only `interface` role objects.
 - `ring_frame`, `bind_to_ring(child, ring, lap, interfaces)` and `project_detail(obj, parent)`.

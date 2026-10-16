@@ -200,8 +200,8 @@ class Surfacing:
         bm.to_mesh(mesh)
         bm.free()
         mesh.attributes.remove(mesh.attributes['gf_region'])
-        if 'crease_edge' in mesh.attributes:
-            mesh.attributes.remove(mesh.attributes['crease_edge'])
+        # The master's edge creases stay on the copied cage: the panel then subdivides to the master's own limit
+        # surface, and shrinkwrap only corrects small offsets instead of chasing sharp styling edges it rounded off.
         mesh.shade_smooth()
         obj = bpy.data.objects.new(name or f'{guide.name} {region}', mesh)  # checks select objects by this name
         bpy.context.scene.collection.objects.link(obj)
@@ -274,37 +274,116 @@ class Surfacing:
         self._refresh_groups(obj)
         return obj
 
-    def build_guide_mesh_stack(self, panel, guide, vgroup='guide_bound', thickness=3.0, bevel_width=0.6,
-                               subsurf_levels=2, wrap_method='NEAREST_SURFACEPOINT', bevel_segments=2, corner_crease=1.0):
-        """SUBSURF -> SHRINKWRAP(master, vertex group) -> SOLIDIFY(inward) -> BEVEL(weight).
+    def _support_cuts(self, obj, pick, corner_mm):
+        """Split boundary edges `corner_mm` from chosen ends, through the inset strip quad beside each edge.
 
-        corner_crease sharpens the panel outline where its outer border turns: subdivision would otherwise round
-        every corner of a sparse cage over a long distance and open the seams toward their ends. Opening loops
-        keep smooth corners; their pockets shape them.
+        pick(bm, edge, a, b) returns the ends to cut ('a', 'b' or both) for a boundary edge running a->b in its
+        strip face. Returns the positions of the new boundary vertices.
         """
+        import bmesh
+        bm = bmesh.new()
+        bm.from_mesh(obj.data)
+        bm.verts.ensure_lookup_table()
+        bm.normal_update()
+
+        def split(a, b, length):
+            edge = next(e for e in a.link_edges if e.other_vert(a) == b)
+            _, vertex = bmesh.utils.edge_split(edge, a, length / (b.co - a.co).length)
+            return vertex
+
+        work = []
+        for edge in [e for e in bm.edges if e.is_boundary]:
+            if len(edge.link_faces) != 1 or len(edge.link_faces[0].verts) != 4:
+                continue
+            loop = next(l for l in edge.link_faces[0].loops if l.edge == edge)
+            a, b = loop.vert, loop.link_loop_next.vert
+            ends = pick(bm, edge, a, b)
+            if ends and edge.calc_length() > (len(ends) + 1) * corner_mm:
+                work.append((loop, ends))
+        added = []
+        for loop, ends in work:
+            a, b = loop.vert, loop.link_loop_next.vert
+            c, d = loop.link_loop_next.link_loop_next.vert, loop.link_loop_prev.vert  # c beside b, d beside a
+            length, inner = (b.co - a.co).length, (c.co - d.co).length
+            step = corner_mm * inner / length
+            if 'b' in ends:
+                near_b, inner_c = split(a, b, length - corner_mm), split(d, c, inner - step)
+                bmesh.ops.connect_verts(bm, verts=[near_b, inner_c])
+                added.append(tuple(near_b.co))
+                b, c = near_b, inner_c
+            if 'a' in ends:
+                near_a = split(a, b, corner_mm)
+                inner_d = split(d, c, step)
+                bmesh.ops.connect_verts(bm, verts=[near_a, inner_d])
+                added.append(tuple(near_a.co))
+        bm.to_mesh(obj.data)
+        bm.free()
+        obj.data.update()
+        return added
+
+    def tighten_opening(self, obj, loop_id, corner_mm=15.0):
+        """Support cuts `corner_mm` from each corner of an opening rim, through the inset strip beside it.
+
+        An opening sliced from one or two master faces has four rim corners, and subdivision turns a four-point
+        boundary into an ellipse. Cuts near each corner (in the rim and the parallel inner strip edge) keep a
+        rectangular opening with corner radii on the order of corner_mm; the pocket rings follow because they
+        are offsets of the rim. Call after inset_panel_perimeter and before build_guide_mesh_stack.
+        """
+        loops = json.loads(obj.get('gf_loops', '{}'))
+        if loop_id not in loops:
+            raise ValueError(f'{obj.name} has no opening {loop_id}')
+        on_rim = _near(loops[loop_id])
+
+        def turns(v):  # a plan corner of the rim, not a vertex the rim runs straight through
+            edges = [e for e in v.link_edges if e.is_boundary]
+            if len(edges) != 2:
+                return False
+            a, b = (d - v.normal * d.dot(v.normal) for d in (e.other_vert(v).co - v.co for e in edges))
+            return a.length > 1e-6 and b.length > 1e-6 and a.angle(b) < math.radians(150)
+
+        def pick(bm, edge, a, b):
+            if not (on_rim(a.co) and on_rim(b.co)):
+                return ()
+            return tuple(k for k, v in (('a', a), ('b', b)) if turns(v))
+
+        added = self._support_cuts(obj, pick, corner_mm)
+        loops[loop_id] = loops[loop_id] + [list(p) for p in added]
+        obj['gf_loops'] = json.dumps(loops)
+        self._refresh_groups(obj)
+        return len(added)
+
+    def tighten_panel_corners(self, obj, corner_mm=15.0, turn_deg=30.0):
+        """Support cuts beside each outer corner of a panel so subdivision keeps its outline straight.
+
+        A sparse panel cage subdivides its corners round over a long distance, opening seams toward their ends.
+        Corners are border vertices whose border turns by more than turn_deg in the surface's tangent plane
+        (a border wrapping around a curved hull is straight on the surface). Opening loops are left to
+        tighten_opening. Call after inset_panel_perimeter.
+        """
+        loops = json.loads(obj.get('gf_loops', '{}'))
+        on_rim = _near([p for points in loops.values() for p in points])
+
+        def corner(v):
+            if on_rim(v.co):
+                return False
+            edges = [e for e in v.link_edges if e.is_boundary]
+            if len(edges) != 2:
+                return False
+            a, b = (d - v.normal * d.dot(v.normal) for d in (e.other_vert(v).co - v.co for e in edges))
+            return a.length > 1e-6 and b.length > 1e-6 and a.angle(b) < math.radians(180 - turn_deg)
+
+        added = self._support_cuts(obj, lambda bm, e, a, b: tuple(k for k, v in (('a', a), ('b', b)) if corner(v)), corner_mm)
+        self._refresh_groups(obj)
+        return len(added)
+
+    def build_guide_mesh_stack(self, panel, guide, vgroup='guide_bound', thickness=3.0, bevel_width=0.6,
+                               subsurf_levels=2, wrap_method='NEAREST_SURFACEPOINT', bevel_segments=2):
+        """SUBSURF -> SHRINKWRAP(master, vertex group) -> SOLIDIFY(inward) -> BEVEL(weight)."""
         import bmesh
         bm = bmesh.new()
         bm.from_mesh(panel.data)
         strips = [e.calc_length() for e in bm.edges if not e.is_boundary and any(v.is_boundary for v in e.verts)]
-        corners = []
-        if corner_crease:
-            bm.normal_update()
-            deform = bm.verts.layers.deform.verify()
-            loops = [g.index for g in panel.vertex_groups if g.name.startswith('gf_loop_')]
-            for v in bm.verts:
-                edges = [e for e in v.link_edges if e.is_boundary]
-                if len(edges) != 2 or any(v[deform].get(g, 0) > .5 for g in loops):
-                    continue
-                # Turn measured in the surface's tangent plane: a border wrapping around a curved hull stays
-                # straight on the surface even where it bends in space.
-                a, b = (d - v.normal * d.dot(v.normal) for d in (e.other_vert(v).co - v.co for e in edges))
-                if a.length > 1e-6 and b.length > 1e-6 and a.angle(b) < math.radians(150):
-                    corners.append(v.index)
         bm.free()
-        if corners:
-            layer = panel.data.attributes.get('crease_vert') or panel.data.attributes.new('crease_vert', 'FLOAT', 'POINT')
-            for index in corners:
-                layer.data[index].value = corner_crease
         if strips and min(strips) / 2 ** subsurf_levels < bevel_width * 1.25:
             raise ValueError(f'{panel.name}: the border control strip subdivides to {min(strips) / 2 ** subsurf_levels:.2f} mm, '
                              f'too narrow for a {bevel_width} mm bevel; widen inset_panel_perimeter or lower the levels')
@@ -395,6 +474,28 @@ class Surfacing:
             bisector /= max(np.linalg.norm(bisector), 1e-9)
             inward.append(bisector / max(float(bisector @ n1), .35))
         inward = np.asarray(inward)
+        # A vertex beside a plan corner (e.g. a tighten_opening support cut) also follows the corner's slide along
+        # its edge; otherwise deeper rings get shorter corner segments, subdivide to sharper corners than the rim
+        # and poke outward as undercuts.
+        def plan(v):
+            return v - local_axis * (v @ local_axis)
+        count = len(points)
+        corner = []
+        for i in range(count):
+            a, b = plan(points[i - 1] - points[i]), plan(points[(i + 1) % count] - points[i])
+            cosine = a @ b / max(np.linalg.norm(a) * np.linalg.norm(b), 1e-12)
+            corner.append(cosine > math.cos(math.radians(170)))  # turns by more than 10 degrees
+        slide = np.zeros_like(inward)
+        for i in range(count):
+            if not corner[i]:
+                continue
+            for j in ((i - 1) % count, (i + 1) % count):
+                if corner[j]:
+                    continue
+                along = plan(points[j] - points[i])
+                along /= max(np.linalg.norm(along), 1e-12)
+                slide[j] += (inward[i] @ along) * along
+        inward = inward + slide
         draft = math.tan(math.radians(draft_angle_deg))
         profile = [(fillet_mm * math.sin(math.radians(a)), fillet_mm * (1 - math.cos(math.radians(a))), 0.0)
                    for a in (30, 60, 90)]
@@ -535,6 +636,16 @@ class Surfacing:
             obj.hide_render = True
             result.append(self.api.mark(obj))
         return result
+
+
+def _near(points, tolerance=1e-3):
+    """Membership test for recorded loop positions (mathutils KD-tree; scipy is not bundled with Blender)."""
+    from mathutils.kdtree import KDTree
+    tree = KDTree(max(len(points), 1))
+    for index, point in enumerate(points):
+        tree.insert(point, index)
+    tree.balance()
+    return lambda co: bool(points) and tree.find(co)[2] < tolerance
 
 
 def _vector(values):

@@ -33,6 +33,8 @@ s = api.surf
 guide = bpy.data.objects['Master hull']
 body = s.slice_panel(guide, 'front_body', openings=['lamp_l', 'lamp_r'], name='Front body')
 s.inset_panel_perimeter(body, 8.0, gap=1.8)                 # control loop + seam retreat
+s.tighten_panel_corners(body, 15.0)                         # straight outline: even seams to their ends
+s.tighten_opening(body, 'lamp_l', 20.0)                     # rectangular opening instead of an oval
 s.build_guide_mesh_stack(body, guide, thickness=3.0, bevel_width=.6, subsurf_levels=3)
 s.recessed_pocket_extrude(body, 'lamp_l', depth=60, draft_angle_deg=5, fillet_mm=12)
 s.extract_interface_ring(body, 'lamp_l', name='_interface_lamp_l')             # rim: openings and pull axis
@@ -40,6 +42,7 @@ s.extract_interface_ring(body, 'lamp_l_floor', name='_interface_lamp_l_seat')  #
 ```
 
 - `slice_panel` copies the region's cage faces and conforms them onto the master surface. A limit surface lies inside its control cage, so unconformed cages leave partly weighted vertices proud.
+- `slice_panel` keeps the master's creases, so the panel subdivides to the master's own limit surface. `tighten_panel_corners` and `tighten_opening` add support cuts beside panel and opening corners; an opening on one or two master faces otherwise subdivides into an oval. A corner distance too tight for the panel thickness folds the solidified shell (proud vertices in `recess`); widen it until they vanish.
 - `build_guide_mesh_stack` gives each panel the same stack: Subdivision → Shrinkwrap onto the master (vertex group `guide_bound`) → Solidify inward → Bevel by weight. Every panel's exterior lies on the one master, so highlights continue across panel gaps.
 - The border control strip must stay wider than the bevel after subdivision (strip / 2^levels > 1.25 × bevel). The helper refuses narrower combinations. Raise the panel level where chords sag on tight curvature; `coverage` measures it.
 - `recessed_pocket_extrude` forms lamps, vents and sockets as painted returns. The rim stays flush at weight 1. The explicitly built quarter-circle fillet, drafted wall and open seat sit at weight 0 and keep their constructed shape; partial weights would drag the return back onto the master and fold it. Place lenses, bearing races, glands and webs behind the return; do not mount a box proud of the skin.
