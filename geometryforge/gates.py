@@ -110,6 +110,8 @@ def validate(p):
                 raise ValueError(f'Gate {name}: missing review config {review["config"]}')
             if 'min_views' in review and (type(review['min_views']) is not int or review['min_views'] < 1):
                 raise ValueError(f'Gate {name}: min_views must be a positive integer')
+            if 'iou_min' in review and (type(review['iou_min']) not in (int, float) or not 0 < review['iou_min'] <= 1):
+                raise ValueError(f'Gate {name}: iou_min must be a number in (0, 1]')
     if set(parts) - owner.keys():
         raise ValueError(f'Every part needs a gate; unassigned: {sorted(set(parts) - owner.keys())}')
     order = {name: gate['order'] for name, gate in gates.items()}
@@ -184,7 +186,8 @@ def _review_evidence(p, gate, scene_sha):
     missing = set(requirement.get('modes', [])) - rendered
     if missing:
         failures.append(f'Review {report["review_id"]} lacks modes {sorted(missing)}')
-    minimum_iou = thresholds(p['parameters'], 'global')['silhouette_iou_min']
+    # A gate may score its review below the project default, e.g. before later gates add parts the masks include.
+    minimum_iou = requirement.get('iou_min', thresholds(p['parameters'], 'global')['silhouette_iou_min'])
     metrics = report.get('metrics', {})
     for view in requirement.get('iou_views', []):
         iou = metrics.get(view, {}).get('silhouette_iou')

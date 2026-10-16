@@ -85,7 +85,7 @@ def design_run(root, **kw):
     return engine.execute(root, target='design', **kw)['targets']['design']
 
 
-def fake_review(root, views=2, modes=('zebra', 'clay')):
+def fake_review(root, views=2, modes=('zebra', 'clay'), metrics=None):
     p = projects.load(root)
     safe = p['state']['targets']['design']['safe_point']
     native = engine.record(p, safe)['targets']['design']['backends']['blender']['native']
@@ -93,7 +93,8 @@ def fake_review(root, views=2, modes=('zebra', 'clay')):
     folder = root / 'review' / f'20990101T0000{count:02d}Z-0000beef'  # newest review wins
     folder.mkdir(parents=True)
     write(folder / 'report.json', {'version': 1, 'review_id': folder.name, 'status': 'complete', 'scene_sha256': native['sha256'],
-                                   'config_sha256': 'x', 'views': [{'id': f'v{i}', 'artifacts': {m: 'x.png' for m in modes}} for i in range(views)]})
+                                   'config_sha256': 'x', 'metrics': metrics or {},
+                                   'views': [{'id': f'v{i}', 'artifacts': {m: 'x.png' for m in modes}} for i in range(views)]})
 
 
 def accept(root, gate):
@@ -145,6 +146,20 @@ def test_acceptance_requires_safe_point_checks_and_review(gated):
     assert record['accepted_by'] == 'Dave' and set(record['backends']['blender']['geometry']) == {'hull'}
     assert record['checks']['blender/hull_closed']['acceptance']['met']
     assert record['review']['views'] == 3
+
+
+def test_gate_review_iou_minimum_overrides_the_project_default(gated):
+    root, _ = gated
+    contract = CONTRACT.replace('min_views = 2', 'min_views = 2\niou_views = ["v0"]')
+    (root / 'project.toml').write_text(contract, encoding='utf-8')
+    design_run(root)
+    fake_review(root, metrics={'v0': {'silhouette_iou': 0.85}})
+    assert any('silhouette IoU 0.850 below 0.9' in f for f in gates.check(root, 'master')['failures'])
+    (root / 'project.toml').write_text(contract.replace('iou_views', 'iou_min = 0.8\niou_views'), encoding='utf-8')
+    assert gates.check(root, 'master')['ready']
+    (root / 'project.toml').write_text(contract.replace('iou_views', 'iou_min = 1.5\niou_views'), encoding='utf-8')
+    with pytest.raises(ValueError, match='iou_min'):
+        projects.load(root)
 
 
 def accept_master(root):

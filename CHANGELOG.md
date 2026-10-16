@@ -6,6 +6,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- **Per-gate review IoU:** `[gates.<id>.review] iou_min` scores a gate's review below the project default, for early gates whose reference masks include parts that later gates add.
 - **Format 3 modeling gates:** `[gates.*]` order calibration, master hull, panels and detail.
   - Only accepted gates and the active gate are buildable; later parts are dormant and refused.
   - Accepted geometry is locked; a changed locked part makes the run a candidate.

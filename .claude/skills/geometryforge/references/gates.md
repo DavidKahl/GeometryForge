@@ -21,6 +21,7 @@ config = "reviews/master.json"     # optional; when given, the review must use t
 modes = ["zebra", "silhouette", "overlay"]
 min_views = 21                      # default gf_thresholds.review.min_views
 iou_views = ["survey21_ref_primary"]
+iou_min = 0.8                       # optional; default gf_thresholds.global.silhouette_iou_min
 
 [gates.panels]
 order = 2
@@ -55,7 +56,7 @@ The active gate is the lowest-order gate that is not accepted. Its parts and tho
 1. every earlier gate is accepted;
 2. the gate route has a passed safe point holding each selected backend's latest run, the working scene is unchanged and the inputs are current;
 3. every gate check passed in that run and met its thresholds (measure-mode checks record misses without failing runs; the gate still requires them);
-4. if the gate declares a review, the newest complete review of exactly the safe-point Blender scene (and of `review.config` when given) has at least `min_views` views, renders every required mode, and scores `silhouette_iou_min` or better in each `iou_views` view.
+4. if the gate declares a review, the newest complete review of exactly the safe-point Blender scene (and of `review.config` when given) has at least `min_views` views, renders every required mode, and scores `iou_min` (default `silhouette_iou_min`) or better in each `iou_views` view. Lower `iou_min` on an early gate when the reference masks include parts that later gates add, and record why.
 
 A calibration gate is ready when each listed camera is calibrated, its RMS reprojection error is within `max_rms_px`, and its image, mask and correspondences are unchanged since solving.
 
