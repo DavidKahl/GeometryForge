@@ -21,7 +21,7 @@ document.querySelector('#app')!.innerHTML=`
 <div id="compare-mode" class="segmented" hidden><button data-mode="split" class="active">Side by side</button><button data-mode="overlay">Overlay</button></div>
 <select id="backend" aria-label="Backend"><option>blender</option><option>houdini</option></select><button id="fit" class="small" title="Fit view (F)">Fit</button></div>
 <div id="diff" class="diff" hidden></div>
-<div id="route-toolbar" class="toolbar" hidden><label>Representation <select id="target" aria-label="Representation"></select></label><label>Compare representation <select id="compare-target" aria-label="Compare representation"></select></label><label><input id="normalize" type="checkbox"> Normalize comparison size</label><span id="game-tools"><label><input id="wireframe" type="checkbox"> Wireframe</label><label><input id="collision" type="checkbox"> Collision</label><label><input id="pivots" type="checkbox"> Pivots / sockets</label><label>LOD <select id="lod" aria-label="LOD"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label></span></div>
+<div id="route-toolbar" class="toolbar" hidden><label>Representation <select id="target" aria-label="Representation"></select></label><label>Compare representation <select id="compare-target" aria-label="Compare representation"></select></label><label><input id="normalize" type="checkbox"> Normalize comparison size</label><label><input id="guides" type="checkbox"> Guides</label><span id="game-tools"><label><input id="wireframe" type="checkbox"> Wireframe</label><label><input id="collision" type="checkbox"> Collision</label><label><input id="pivots" type="checkbox"> Pivots / sockets</label><label>LOD <select id="lod" aria-label="LOD"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label></span></div>
 <div id="viewport"><div id="overlays"></div><div class="empty" id="empty">Your geometry will appear here.<br><small>Select a run to explore its parts.</small></div><div id="progress" hidden></div><div id="hover" hidden></div><span id="dimensions"></span></div>
 <div class="hint">Click a part to select · Ctrl/Shift-click to add · double-click or <kbd>I</kbd> to isolate · <kbd>H</kbd> hide · <kbd>Alt</kbd>+<kbd>H</kbd> show all · <kbd>F</kbd> fit · <kbd>Esc</kbd> back</div>
 </section>
@@ -68,6 +68,8 @@ function partObject(l:Loaded,ghost=false,run?:Run){
   for(const [i,geometry] of l.geometries.entries()){const colour=colourMode==='filament'?filamentColour(run,l.filaments[i]):partColor(l.name);
     const info=l.meshInfo[i],game=!!l.game;
     if(game&&info.role==='collision'&&!checked('collision'))continue;
+    // Master hulls and interface rings are construction guides; panels cover them, so draw them only on request.
+    if((info.role==='guide'||info.role==='interface')&&!checked('guides'))continue;
     if(game&&info.role!=='collision'&&info.lod!==Number(($('lod') as HTMLSelectElement).value))continue;
     const material=ghost?ghostMaterial():game&&info.role==='collision'?new THREE.MeshStandardMaterial({color:0x62ef96,wireframe:true,transparent:true,opacity:.6}):game?info.materialIds.map(id=>gameMaterial(l,id)):new THREE.MeshStandardMaterial({color:colour,roughness:.55,metalness:.05});
     const mesh=new THREE.Mesh(geometry,Array.isArray(material)&&!material.length?new THREE.MeshStandardMaterial({color:colour}):material);
@@ -85,6 +87,8 @@ function rebuild(refit:boolean){
   const place=(pane:Pane,loaded:Map<string,Loaded>|undefined,run:Run|undefined,ghost=false)=>{const out=new Map<string,THREE.Group>();
     for(const n of names){const l=loaded?.get(n);if(l){const o=partObject(l,ghost,run);pane.root.add(o);out.set(n,o)}}return out};
   const objsA=place(a,loadedA,runA),objsB=b?place(b,loadedB,runB):runB&&mode==='overlay'?place(a,loadedB,runB,true):new Map<string,THREE.Group>();
+  // Drawn mesh count, for browser tests and agents inspecting what the viewer shows.
+  $('viewport').dataset.meshes=String(panes.reduce((n,p)=>{let c=0;p.root.traverse(o=>{if((o as THREE.Mesh).isMesh)c++});return n+c},0));
   if(runB&&checked('normalize')){const ba=new THREE.Box3(),bb=new THREE.Box3();for(const o of objsA.values())ba.expandByObject(o);for(const o of objsB.values())bb.expandByObject(o);const ratio=ba.getSize(new THREE.Vector3()).length()/bb.getSize(new THREE.Vector3()).length();if(Number.isFinite(ratio)&&ratio>0)for(const o of objsB.values())o.scale.setScalar(ratio)}
   if(state.isolated){
     // A fresh scene for the selection: recentre so each part is inspected on its own ground, not at its assembly position.
@@ -318,7 +322,7 @@ $('colour-mode').querySelectorAll('button').forEach(b=>(b as HTMLButtonElement).
 $('pose').querySelectorAll('button').forEach(b=>(b as HTMLButtonElement).onclick=()=>{pose=(b as HTMLButtonElement).dataset.pose as typeof pose;rebuild(true);renderToolbar()});
 $('compare-mode').querySelectorAll('button').forEach(b=>(b as HTMLButtonElement).onclick=()=>{mode=(b as HTMLButtonElement).dataset.mode as typeof mode;rebuild(false);renderToolbar()});
 $('backend').onchange=guarded(()=>loadView());$('fit').onclick=()=>viewer.fit();
-for(const id of ['wireframe','collision','pivots','lod','normalize'])$(id).onchange=()=>rebuild(false);
+for(const id of ['wireframe','collision','pivots','lod','normalize','guides'])$(id).onchange=()=>rebuild(false);
 $('target').onchange=guarded(async()=>{pose='assembly';state.isolated=null;const select=$('backend') as HTMLSelectElement;const names=Object.keys(runA?.targets?.[targetName()]?.backends??{});const previous=select.value;select.replaceChildren(...names.map(n=>el('option',{value:n,textContent:n})));if(names.includes(previous))select.value=previous;await loadView()});
 $('compare-target').onchange=guarded(async()=>{const target=compareTargetName();const candidate=runB?.targets?.[target]?runB:runA?.targets?.[target]?runA:runs.find(r=>r.targets?.[target]?.status==='passed');if(candidate)await setCompare(candidate);else toast('No retained run contains that representation')});
 $('safe').onclick=()=>{const run=runs.find(r=>r.id===safePoint());if(run)void openRun(run).catch(e=>toast(String(e)))};
@@ -327,7 +331,7 @@ $('safe').onclick=()=>{const run=runs.find(r=>r.id===safePoint());if(run)void op
 async function refreshProjects(){projects=await api('/projects');$('projects').replaceChildren();for(const [id,p] of Object.entries(projects)){if(p.archived&&!($('show-archived') as HTMLInputElement).checked)continue;const b=button(p.title,()=>void openProject(id).catch(e=>toast(String(e))),'project '+(id===session.key?'active':''));b.title=p.path;$('projects').append(b)}}
 async function openProject(id:string){
   ($('target') as HTMLSelectElement).replaceChildren();($('compare-target') as HTMLSelectElement).replaceChildren();
-  pose='assembly';($('lod') as HTMLSelectElement).value='0';for(const id of ['wireframe','collision','pivots','normalize'])($ (id) as HTMLInputElement).checked=false;
+  pose='assembly';($('lod') as HTMLSelectElement).value='0';for(const id of ['wireframe','collision','pivots','normalize','guides'])($ (id) as HTMLInputElement).checked=false;
   revision++;clearCache();clearGameTextures();session.key=id;runA=runB=undefined;loadedA=new Map();loadedB=undefined;state.selection.clear();state.hidden.clear();state.isolated=null;state.filter='';($('part-filter') as HTMLInputElement).value='';
   viewer.setPanes([]);$('overlays').replaceChildren();$('title').textContent=projects[id].title;$('path').textContent=projects[id].path;renderAll();
   await refreshProjects();await refresh();const start=runs.find(r=>r.id===ctx?.safe_point)??runs[0];if(start)await openRun(start);else $('empty').hidden=false;
@@ -335,7 +339,10 @@ async function openProject(id:string){
 async function refresh(){
   if(!session.key)return;const requested=session.key;const result=await Promise.all([api(`/projects/${requested}/context`),api(`/projects/${requested}/runs`),api(`/projects/${requested}/imports`)]);if(session.key!==requested)return;[ctx,runs,importEvidence]=result;
   const stale=Object.values(ctx!.backends).some(s=>s.stale||s.working_changed);
-  $('banner').textContent=ctx!.safe_point_label+' · '+Object.entries(ctx!.backends).map(([b,s])=>`${b}: ${s.stale?'out of date':'current'}${s.working_changed?' (saved edits detected)':''}`).join(' · ');
+  // Format 2+ projects report each route on its own: a finished design route stays current while a later game route is unbuilt.
+  const routes=Object.entries(ctx!.targets??{});
+  const status=routes.length?routes.map(([t,r])=>`${t}: ${!r.safe_point?'not built':r.stale?'out of date':'current'}`):Object.entries(ctx!.backends).map(([b,s])=>`${b}: ${s.stale?'out of date':'current'}${s.working_changed?' (saved edits detected)':''}`);
+  $('banner').textContent=ctx!.safe_point_label+' · '+status.join(' · ');
   $('banner').className='pill banner '+(ctx!.safe_point?stale?'warn':'passed':'candidate');
   renderRunsPanel();renderToolbar();
 }

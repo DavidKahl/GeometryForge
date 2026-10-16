@@ -36,11 +36,16 @@ def fake_native(backend, out, entry, parameters, parts, source, timeout, executa
     """Stand-in for a Blender/Houdini worker: one box per declared part, sized from the fixture table."""
     shapes = read(Path(entry).parent / "shapes.json")
     objects = []
-    for name, (size, centre, slot) in shapes.items():
+    for name, (size, centre, slot, *extra) in shapes.items():
         mesh = trimesh.creation.box(size)
         mesh.apply_translation(centre)
         objects.append(dict(name=name, part=name, vertices=mesh.vertices.tolist(), faces=mesh.faces.tolist(),
                             filament=slot, print_rotation_deg=[0, 0, 0], expected_bodies=1))
+        if "guide" in extra:  # a slightly larger hidden master surface, as gated surfacing projects export
+            master = trimesh.creation.box(np.asarray(size) + 4)
+            master.apply_translation(centre)
+            objects.append(dict(name=name + "_master", part=name, role="guide", vertices=master.vertices.tolist(),
+                                faces=master.faces.tolist(), matrix_world=np.eye(4).tolist(), metadata={}))
     exports = {}
     if backends.native_context.get().get('target') == 'game':
         game_objects=[]
@@ -130,6 +135,18 @@ def seed():
     d=read(game_root/'decisions.json');d['output_targets']=['game','print'];write(game_root/'decisions.json',d)
     result=engine.execute(game_root);assert result['status']=='passed',result['failures']
     projects.register(game_root,'Fixture Game')
+
+    surface=HOME/'fixture_surface'
+    projects.initialize(surface,ident='fixture_surface',deliverables='blender',brief='Design route with a guide master')
+    (surface/'models').mkdir();(surface/'checks').mkdir()
+    (surface/'models/entry.py').write_text('# browser stand-in')
+    (surface/'checks/verify.py').write_text(CHECKER)
+    project(surface,'Fixture Surface',{'panel':([60,40,20],[0,0,10],1,'guide')},{'panel_check':['panel']},{'break_check':False})
+    migrate(surface)
+    with (surface/'project.toml').open('a') as stream:
+        stream.write('\n[targets.design]\n')
+    result=engine.execute(surface,target='design');assert result['targets']['design']['status']=='passed',result['failures']
+    projects.register(surface,'Fixture Surface')
 
 
 if __name__ == "__main__":

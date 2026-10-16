@@ -110,3 +110,15 @@ test('renders open in the viewer and download only on request',async({page})=>{
   await page.keyboard.press('Escape');await expect(page.locator('#lightbox')).toBeHidden();
   await page.getByRole('button',{name:'View backend log'}).click();await expect(page.locator('#lightbox .log')).not.toHaveText('Loading…');
 });
+
+test('guide masters stay hidden until requested and routes report their own state',async({page})=>{
+  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('/');await project(page,'Fixture Surface').click();
+  await expect(leaves(page)).toHaveCount(1,{timeout:30000});
+  await expect(page.locator('#banner')).toContainText('design: current');await expect(page.locator('#banner')).toContainText('print: not built');
+  await expect(page.locator('#guides')).not.toBeChecked();
+  await expect(page.locator('#viewport')).toHaveAttribute('data-meshes','1');
+  await page.locator('#guides').check();await expect(page.locator('#viewport')).toHaveAttribute('data-meshes','2');
+  await page.locator('#guides').uncheck();await expect(page.locator('#viewport')).toHaveAttribute('data-meshes','1');
+  expect(errors).toEqual([]);
+});
