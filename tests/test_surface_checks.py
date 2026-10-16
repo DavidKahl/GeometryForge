@@ -67,6 +67,17 @@ def test_flush_seam_passes():
     assert m['master_deviation_max_mm'] < 0.05 and m['step_max_mm'] < 0.05
 
 
+def test_staggered_coarse_borders_measure_the_true_gap():
+    # Coarse borders offset by half a vertex spacing along the seam (~11 mm): the gap is still 3 mm.
+    delta, step = 1.5 / R, .5 / 11 / 2
+    MV, MF = grid(sphere(), (-.5, .5), (-.3, .3), 401, 121)
+    AV, AF = grid(sphere(), (delta, .4), (-.25, .25), 40, 12)
+    BV, BF = grid(sphere(), (-.4, -delta), (-.25 + step, .25 + step), 40, 12)
+    objects = [obj('master', 'master', MV, MF, 'guide'), obj('A', 'front', AV, AF), obj('B', 'skirt', BV, BF)]
+    m = surface_checks.verify(payload(objects, 'seam', SEAM))['measurements']
+    assert 2.9 < m['gap_min_mm'] <= m['gap_max_mm'] < 3.2
+
+
 def test_stepped_seam_fails_with_locations():
     result = surface_checks.verify(payload(seam_scene(lift=1.0), 'seam', SEAM))
     assert not result['passed']

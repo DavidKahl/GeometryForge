@@ -33,6 +33,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- **Seam gap on staggered borders:** seam checks pair each border vertex with the nearest point on the other panel's border edges and measure the gap to that point. Coarse or differently subdivided borders no longer drop out of pairing or count their along-seam offset as gap. Border vertices whose gap vector runs along their own border (panel corners) are excluded.
+
 - Recipes now receive parts dependencies-first. Alphabetical order could build a dependent part against geometry that its dependency's rebuild then deleted.
 - Failed project checks keep their measurements in the run record instead of only an error string.
 

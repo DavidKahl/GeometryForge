@@ -85,6 +85,42 @@ def exterior(V, F, master, limits, objects):
     return mask, sd, normals, mnormal
 
 
+def closest_on_border(side, vertices, points):
+    """Closest points on the border edges incident to each paired vertex.
+
+    Paired vertices are staggered along the seam when the two panels subdivide their borders differently;
+    measuring vertex to vertex would count that along-seam offset as gap.
+    """
+    V, edges = side['V'], np.asarray(side['border_edges'])
+    result = V[vertices].copy()
+    best = np.linalg.norm(result - points, axis=1)
+    for column in (0, 1):
+        for vertex_slot, (index, point) in enumerate(zip(vertices, points)):
+            for edge in edges[edges[:, column] == index]:
+                a, b = V[edge[0]], V[edge[1]]
+                t = np.clip(np.dot(point - a, b - a) / max(np.dot(b - a, b - a), 1e-12), 0.0, 1.0)
+                candidate = a + t * (b - a)
+                distance = np.linalg.norm(candidate - point)
+                if distance < best[vertex_slot]:
+                    best[vertex_slot], result[vertex_slot] = distance, candidate
+    return result
+
+
+def border_tangents(side, vertices):
+    """Unit border direction at each vertex from its incident border edges (sign-aligned)."""
+    V, edges = side['V'], np.asarray(side['border_edges'])
+    result = np.zeros((len(vertices), 3))
+    for slot, index in enumerate(vertices):
+        total = np.zeros(3)
+        for edge in edges[(edges[:, 0] == index) | (edges[:, 1] == index)]:
+            other = edge[1] if edge[0] == index else edge[0]
+            direction = V[other] - V[index]
+            direction /= max(np.linalg.norm(direction), 1e-12)
+            total += -direction if total @ direction < 0 else direction
+        result[slot] = total / max(np.linalg.norm(total), 1e-12)
+    return result
+
+
 def seam(payload, limits, spec):
     master = master_index(payload, spec)
     sides = {}
@@ -93,11 +129,12 @@ def seam(payload, limits, spec):
         V, F = surface(objects)
         mask, sd, normals, mnormal = exterior(V, F, master, limits, objects)
         skin = F[mask[F].all(axis=1)]
-        border = np.unique(open_edges(skin)) if len(skin) else np.zeros(0, dtype=np.int64)
+        border_edges = open_edges(skin) if len(skin) else np.zeros((0, 2), dtype=np.int64)
+        border = np.unique(border_edges)
         if len(skin):
             # Skin-only normals: border vertices must not average in the bevel roll-off.
             normals = np.where(mask[:, None], vertex_normals(V, skin), normals)
-        sides[key] = dict(V=V, sd=sd, normals=normals, mnormal=mnormal, mask=mask, border=border, skin=skin,
+        sides[key] = dict(V=V, sd=sd, normals=normals, mnormal=mnormal, mask=mask, border=border, border_edges=border_edges, skin=skin,
                           index=TriangleIndex(V, skin) if len(skin) else None)
     a, b = sides['a'], sides['b']
     deviation = np.concatenate([np.abs(s['sd'][s['mask']]) for s in (a, b)])
@@ -112,20 +149,28 @@ def seam(payload, limits, spec):
         report += [{'metric': 'master_deviation_mm', **w} for w in worst(deviation_points, deviation, 5)]
     pairs = []
     if len(a['border']) and len(b['border']):
-        # Mutual nearest border vertices: borders running away from the seam do not pair.
+        # Pair each border vertex of a with the nearest point on b's border edges. Distances to edges, not
+        # vertices, keep coarse or staggered borders paired; borders running away from the seam stay out of reach.
         reach = 2 * limits['gap_max_mm'] + 2
-        distance, forward = cKDTree(b['V'][b['border']]).query(a['V'][a['border']], distance_upper_bound=reach)
-        found = np.nonzero(np.isfinite(distance))[0]
+        edges = np.asarray(b['border_edges'])
+        longest = float(np.linalg.norm(b['V'][edges[:, 0]] - b['V'][edges[:, 1]], axis=1).max()) if len(edges) else 0.0
+        _, nearest = cKDTree(b['V'][b['border']]).query(a['V'][a['border']], distance_upper_bound=reach + longest)
+        found = np.nonzero(nearest < len(b['border']))[0]
         if len(found):
-            _, back = cKDTree(a['V'][a['border']]).query(b['V'][b['border'][forward[found]]])
-            mutual = found[back == found]
-            pairs = list(zip(a['border'][mutual], b['border'][forward[mutual]]))
+            i, j = a['border'][found], b['border'][nearest[found]]
+            across = closest_on_border(b, j, a['V'][i]) - a['V'][i]
+            length = np.linalg.norm(across, axis=1)
+            # A seam gap crosses a's own border; along it lie borders that only meet at a corner.
+            crossing = np.abs(np.einsum('ij,ij->i', across / np.maximum(length, 1e-9)[:, None], border_tangents(a, i))) < .5
+            keep = (length <= reach) & crossing
+            pairs = list(zip(i[keep], j[keep]))
     measurements['seam_pairs'] = len(pairs)
     if len(pairs) < limits['min_pairs']:
         failures.append(f'No shared seam between {spec["a"]} and {spec["b"]}: {len(pairs)} paired border vertices')
         return measurements, failures, report
     i, j = np.asarray([x for x, _ in pairs]), np.asarray([y for _, y in pairs])
-    p, q = a['V'][i], b['V'][j]
+    p = a['V'][i]
+    q = closest_on_border(b, j, p)
     middle = (p + q) / 2
     _, _, mnorm, _ = master.signed_distance(middle)
     delta = q - p
