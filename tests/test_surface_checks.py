@@ -187,6 +187,15 @@ def test_smooth_recessed_pocket_passes():
     assert m['pocket_faces'] > 0 and m['draft_min_deg'] > 45 and m['fillet_min_mm'] > 5 and m['proud_vertices'] == 0
 
 
+def test_recess_region_selects_pockets():
+    everywhere = surface_checks.verify(payload(pocket_scene(), 'recess', RECESS))['measurements']['pocket_faces']
+    far = {**RECESS, 'region_mm': [[1e5, 1e5, 1e5], [2e5, 2e5, 2e5]]}
+    result = surface_checks.verify(payload(pocket_scene(), 'recess', far))
+    assert result['measurements']['pocket_faces'] == 0 and any('No recessed pocket' in f for f in result['acceptance']['failures'])
+    whole = {**RECESS, 'region_mm': [[-1e5, -1e5, -1e5], [1e5, 1e5, 1e5]]}
+    assert surface_checks.verify(payload(pocket_scene(), 'recess', whole))['measurements']['pocket_faces'] == everywhere
+
+
 def test_proud_lamp_fails():
     spec = {**RECESS, 'contents': [{'part': 'lamp'}]}
     result = surface_checks.verify(payload(pocket_scene(proud=True), 'recess', spec))

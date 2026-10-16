@@ -33,7 +33,7 @@ Seam pairs are mutual nearest border vertices; fewer than `min_pairs` means the 
 
 ## recess: pockets, lamps, sockets
 
-Spec: `panel`, `master`, optional `ring` (the rim interface ring carrying the pocket's pull axis) and `contents` (lenses, races, bosses that must stay inside). Needs `guide_bound` weights; helper-built pockets also mark `gf_pocket`.
+Spec: `panel`, `master`, optional `ring` (the rim interface ring carrying the pocket's pull axis), `contents` (lenses, races, bosses that must stay inside) and `region_mm` (`[[low], [high]]` box: measure only the pockets inside it, e.g. glazing separately from a socket on the same panel). Needs `guide_bound` weights; helper-built pockets also mark `gf_pocket`.
 
 | Measure | Default | Meaning |
 |---|---|---|

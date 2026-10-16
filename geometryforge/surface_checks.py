@@ -295,6 +295,11 @@ def recess(payload, limits, spec):
         band = face_front & (np.nan_to_num(pocket)[F] >= .5).all(axis=1) & (face_weight < limits['rim_weight'])
     else:
         band = face_front & (face_weight > 1e-6) & (face_weight < limits['rim_weight'])
+    if spec.get('region_mm'):
+        # Measure only the pockets inside a box, e.g. glazing openings separately from a socket on the same panel.
+        low, high = (np.asarray(v, dtype=float) for v in spec['region_mm'])
+        centre = V[F].mean(axis=1)
+        band &= ((centre >= low) & (centre <= high)).all(axis=1)
     measurements['pocket_faces'] = int(band.sum())
     if not band.any():
         failures.append('No recessed pocket found: no front faces with guide_bound falloff below the rim weight')
