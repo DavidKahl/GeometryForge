@@ -8,5 +8,6 @@
   "lamp_draft_deg": 8,
   "lamp_fillet_mm": 16,
   "lens_lap_mm": 5,
-  "bolt_count": 6
+  "bolt_count": 6,
+  "vent_depth_mm": 40
 }

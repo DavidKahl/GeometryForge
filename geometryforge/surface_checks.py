@@ -201,6 +201,10 @@ def seam(payload, limits, spec):
             # A seam gap crosses a's own border; along it lie borders that only meet at a corner.
             crossing = np.abs(np.einsum('ij,ij->i', across / np.maximum(length, 1e-9)[:, None], border_tangents(a, i))) < .5
             keep = (length <= reach) & crossing
+            region = spec.get('region_mm')
+            if region:  # one stretch of the seam, e.g. away from a junction measured by its own check
+                low, high = np.min(region, axis=0), np.max(region, axis=0)
+                keep &= ((a['V'][i] >= low) & (a['V'][i] <= high)).all(axis=1)
             pairs = list(zip(i[keep], j[keep]))
     measurements['seam_pairs'] = len(pairs)
     if len(pairs) < limits['min_pairs']:

@@ -43,9 +43,12 @@ def test_gated_master_hull_workflow(tmp_path, monkeypatch):
         engine.plan(root, parts=['master_hull'], target='design')
 
     panels = design(root)
-    assert set(panels['geometry']) == {'master_hull', 'body', 'skirt'}
-    seam = met(panels, 'seam_body_skirt', 'coverage_hull')['seam_body_skirt']
+    assert set(panels['geometry']) == {'master_hull', 'body', 'skirt', 'vent'}
+    measured = met(panels, 'seam_body_skirt', 'coverage_hull', 'recess_vent')
+    seam = measured['seam_body_skirt']
     assert seam['step_max_mm'] < .01 and seam['master_deviation_max_mm'] < .01
+    # The vent well crosses the body/skirt seam: its own panel, flush rim, closed floor below the skin.
+    assert measured['recess_vent']['proud_vertices'] == 0
     gates.accept(root, 'panels', 'native test', 'fixture acceptance')
 
     detail = design(root)

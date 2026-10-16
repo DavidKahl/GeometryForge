@@ -1,4 +1,5 @@
-"""Gated master-hull fixture: one hull, two shrinkwrapped panels with a lamp pocket, a ring-bound lens."""
+"""Gated master-hull fixture: one hull, two shrinkwrapped panels with a lamp pocket, a vent well across their seam,
+a ring-bound lens."""
 import bpy
 import bmesh
 
@@ -10,11 +11,13 @@ def cage(length, width, height):
     bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=3, use_grid_fill=True)
     bm.verts.index_update()
     bm.faces.index_update()
-    regions = {'body': [], 'skirt': [], 'lamp': []}
+    regions = {'body': [], 'skirt': [], 'lamp': [], 'vent': []}
     for face in bm.faces:
         x, y, z = face.calc_center_median()
         if x > .49 and abs(y) < .2 and .25 < z < .45:  # fully surrounded by body faces
             regions['lamp'].append(face.index)
+        elif x < -.49 and abs(y) < .2 and abs(z) < .25:  # straddles the body/skirt seam at z = 0
+            regions['vent'].append(face.index)
         else:
             regions['body' if z > 0 else 'skirt'].append(face.index)
     verts = [(v.co.x * length, v.co.y * width, v.co.z * height) for v in bm.verts]
@@ -23,12 +26,15 @@ def cage(length, width, height):
     return verts, faces, regions
 
 
-def panel(api, guide, region, name, parameters, openings=()):
+def panel(api, guide, region, name, parameters, openings=(), well=False, **metadata):
     s = api.surf
-    obj = s.slice_panel(guide, region, openings=openings, name=name)
+    obj = s.slice_panel(guide, region, openings=openings, name=name, **metadata)
     # Level 3 keeps chords on the tight corners close to the master (coverage check).
     # The border strip must stay wider than the bevel after subdivision: 8 mm / 2^3 = 1 mm > 0.6 mm.
     s.inset_panel_perimeter(obj, 8.0, gap=parameters['panel_gap_mm'])
+    s.tighten_panel_corners(obj, 15.0)  # square corners where the seam meets the vent well, so no master shows
+    if well:  # the vent crosses the body/skirt seam, so it is its own recessed insert
+        s.open_well(obj, 'vent')
     s.build_guide_mesh_stack(obj, guide, thickness=parameters['panel_thickness_mm'], bevel_width=.6, subsurf_levels=3)
     return obj
 
@@ -48,6 +54,10 @@ def build_parts(parameters, parts, api):
             s.extract_interface_ring(body, 'lamp_floor', name='_interface_lamp_seat')
         elif part == 'skirt':
             panel(api, bpy.data.objects['Master hull'], 'skirt', 'Skirt panel', parameters)
+        elif part == 'vent':
+            vent = panel(api, bpy.data.objects['Master hull'], 'vent', 'Vent well', parameters, well=True, feature='vent')
+            s.recessed_pocket_extrude(vent, 'vent', parameters['vent_depth_mm'], 6.0, 10.0, floor=True)
+            s.extract_interface_ring(vent, 'vent', name='_interface_vent')
         elif part == 'lens':
             from geometryforge.sections import superellipse_ring
             outline = superellipse_ring(60, 60, 2.0, 32)

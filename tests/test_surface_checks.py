@@ -92,6 +92,24 @@ def test_skin_border_sits_where_the_normal_limit_is_crossed():
     np.testing.assert_allclose(P[[1, 3]], V[[1, 3]])
 
 
+def test_seam_region_measures_one_stretch():
+    # B is flush for y < 0 and stands 1 mm proud for y > 0 (a junction stretch measured by its own check).
+    delta = 1.5 / R
+    MV, MF = grid(sphere(), (-.5, .5), (-.3, .3), 401, 121)
+    AV, AF = grid(sphere(), (delta, .4), (-.25, .25), 120, 60)
+    LV, LF = grid(sphere(), (-.4, -delta), (-.25, -.002), 120, 30)
+    HV, HF = grid(sphere(R + 1.0), (-.4, -delta), (.002, .25), 120, 30)
+    objects = [obj('master', 'master', MV, MF, 'guide'), obj('A', 'front', AV, AF),
+               obj('B low', 'skirt', LV, LF), obj('B high', 'skirt', HV, HF)]
+    whole = surface_checks.verify(payload(objects, 'seam', SEAM, {'master_deviation_mm': 1000}))
+    assert any('Seam step' in f for f in whole['acceptance']['failures'])
+    low = surface_checks.verify(payload(objects, 'seam', {**SEAM, 'region_mm': [[-50, -200, 0], [50, -5, 600]]}, {'master_deviation_mm': 1000}))
+    assert low['passed'], low['acceptance']
+    assert 10 < low['measurements']['seam_pairs'] < whole['measurements']['seam_pairs']
+    empty = surface_checks.verify(payload(objects, 'seam', {**SEAM, 'region_mm': [[-50, 300, 0], [50, 400, 600]]}))
+    assert any('No shared seam' in f for f in empty['acceptance']['failures'])
+
+
 def test_stepped_seam_fails_with_locations():
     result = surface_checks.verify(payload(seam_scene(lift=1.0), 'seam', SEAM))
     assert not result['passed']

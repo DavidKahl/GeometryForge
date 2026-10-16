@@ -330,11 +330,12 @@ class Surfacing:
         sub.use_creases = True
         return obj
 
-    def slice_panel(self, guide, region, openings=(), name=None, output_id=None, conform=True):
+    def slice_panel(self, guide, region, openings=(), name=None, output_id=None, conform=True, **metadata):
         """Copy one master region's cage faces as a panel; opening borders get gf_loop_<opening> groups.
 
         conform moves the copied cage onto the master's evaluated surface. A subdivision limit surface lies
         inside its control cage, so an unconformed panel cage would leave partly-weighted vertices proud.
+        Extra metadata (e.g. feature='door' for detail inventories) is exported with the panel.
         """
         import bmesh
         bpy = _bpy()
@@ -376,8 +377,37 @@ class Surfacing:
             mesh.update()
             after = np.array([v.co for v in mesh.vertices], dtype=float)
             loops = {key: [tuple(after[int(np.linalg.norm(before - p, axis=1).argmin())]) for p in points] for key, points in loops.items()}
-        self.api.register_output(obj, output_id, 'design', kind='panel', region=region, openings=list(openings))
+        self.api.register_output(obj, output_id, 'design', **{'kind': 'panel', **metadata, 'region': region, 'openings': list(openings)})
         obj['gf_loops'] = json.dumps(loops)
+        self._refresh_groups(obj)
+        return obj
+
+    def open_well(self, obj, loop_id='well'):
+        """Turn a sliced panel into a recessed insert: keep its border strip, open the interior as opening loop_id.
+
+        For openings that straddle panel lines (a vent across a seam, a lamp in a corner): slice the opening's own
+        region as a panel, give it its seam gap with inset_panel_perimeter, open it here, then bind it with
+        build_guide_mesh_stack and fall off the inner border with recessed_pocket_extrude(obj, loop_id, ...,
+        floor=True for a closed well, False for an open seat). The flush rim strip keeps the neighbours' seams.
+        """
+        import bmesh
+        loops = json.loads(obj.get('gf_loops', '{}'))
+        if loops:
+            raise ValueError(f'{obj.name} already has openings; a well is sliced from the opening region itself')
+        bm = bmesh.new()
+        bm.from_mesh(obj.data)
+        rim = {v for e in bm.edges if e.is_boundary for v in e.verts}
+        interior = [f for f in bm.faces if not rim.intersection(f.verts)]
+        if not interior:
+            bm.free()
+            raise ValueError(f'{obj.name} has no faces inside its border strip; call inset_panel_perimeter first')
+        bmesh.ops.delete(bm, geom=interior, context='FACES_ONLY')
+        bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
+        inner = [tuple(v.co) for v in {v for e in bm.edges if e.is_boundary for v in e.verts} - rim]
+        bm.to_mesh(obj.data)
+        bm.free()
+        obj.data.update()
+        obj['gf_loops'] = json.dumps({loop_id: inner})
         self._refresh_groups(obj)
         return obj
 

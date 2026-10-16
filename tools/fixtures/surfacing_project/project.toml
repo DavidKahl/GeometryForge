@@ -21,6 +21,11 @@ sources = ["models/blender.py"]
 parameters = ["panel_gap_mm", "panel_thickness_mm"]
 depends = ["master_hull"]
 
+[parts.vent]
+sources = ["models/blender.py"]
+parameters = ["panel_gap_mm", "panel_thickness_mm", "vent_depth_mm"]
+depends = ["master_hull"]
+
 [parts.lens]
 sources = ["models/blender.py"]
 parameters = ["lens_lap_mm"]
@@ -45,6 +50,8 @@ parts = ["body", "skirt", "master_hull"]
 a = {part = "body"}
 b = {part = "skirt"}
 master = {part = "master_hull"}
+# The seam ends in the vent well on the -X face; those corner junctions round off and are left to recess_vent.
+region_mm = [[-540, -400, -100], [700, 400, 100]]
 
 [checks.recess_lamp]
 kind = "recess"
@@ -59,14 +66,25 @@ contents = [{part = "lens"}]
 # ~2.7 mm right at those corners. Production openings carry more cage resolution and rounded corners.
 fillet_min_mm = 2.5
 
+[checks.recess_vent]
+kind = "recess"
+parts = ["vent", "master_hull"]
+[checks.recess_vent.spec]
+panel = {part = "vent"}
+master = {part = "master_hull"}
+[checks.recess_vent.thresholds]
+# Like the lamp: a two-by-two-face opening with square plan corners (tightened so no master shows at the seam
+# junctions); subdivision tightens the return to ~2.7 mm right at those corners.
+fillet_min_mm = 2.5
+
 [checks.coverage_hull]
 kind = "global"
-parts = ["body", "skirt", "master_hull"]
+parts = ["body", "skirt", "vent", "master_hull"]
 [checks.coverage_hull.spec]
 test = "coverage"
 master = {part = "master_hull"}
-panels = [{part = "body"}, {part = "skirt"}]
-openings = [{part = "body", roles = ["interface"], objects = ["_interface_lamp"]}]
+panels = [{part = "body"}, {part = "skirt"}, {part = "vent"}]
+openings = [{part = "body", roles = ["interface"], objects = ["_interface_lamp"]}, {part = "vent", roles = ["interface"]}]
 [checks.coverage_hull.thresholds]
 # The cube cage puts valence-3 poles under the panels at eight tight corners; nearest-point
 # shrinkwrap leaves up to ~6 mm there at panel level 3. Real hulls keep poles off tight curvature.
@@ -107,8 +125,8 @@ min_views = 6
 
 [gates.panels]
 order = 1
-parts = ["body", "skirt"]
-checks = ["seam_body_skirt", "coverage_hull"]
+parts = ["body", "skirt", "vent"]
+checks = ["seam_body_skirt", "coverage_hull", "recess_vent"]
 
 [gates.detail]
 order = 2
