@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parent.parent
 PACKAGE = Path(__file__).resolve().parent
 ID = re.compile(r"^[a-z][a-z0-9_]*$")
 
-CHECK_KINDS = ("seam", "recess", "mating", "global")
+CHECK_KINDS = ("seam", "recess", "mating", "global", "detail")
 SURFACE_CHECKS = PACKAGE / "surface_checks.py"
 
 def checker(root, check):

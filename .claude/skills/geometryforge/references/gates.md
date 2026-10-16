@@ -30,8 +30,8 @@ checks = ["seam_front_skirt", "recess_lamps", "coverage_hull"]
 
 [gates.detail]
 order = 3
-parts = ["engines", "pads"]
-checks = ["mating_engine_left"]
+parts = ["engines", "pads", "fasteners"]
+checks = ["mating_engine_left", "detail_inventory"]
 ```
 
 - Orders are 0..n-1. Every part belongs to exactly one geometry gate, and parts may depend only on parts in the same or an earlier gate.
@@ -55,7 +55,7 @@ The active gate is the lowest-order gate that is not accepted. Its parts and tho
 
 1. every earlier gate is accepted;
 2. the gate route has a passed safe point holding each selected backend's latest run, the working scene is unchanged and the inputs are current;
-3. every gate check passed in that run and met its thresholds (measure-mode checks record misses without failing runs; the gate still requires them);
+3. every gate check passed in that run and met its thresholds (measure-mode checks record misses without failing runs; the gate still requires them). The final geometry gate must declare a `detail` check (see [checks](checks.md)); without one detail can drop out while every surface check passes;
 4. if the gate declares a review, the newest complete review of exactly the safe-point Blender scene (and of `review.config` when given) has at least `min_views` views, renders every required mode, and scores `iou_min` (default `silhouette_iou_min`) or better in each `iou_views` view. Lower `iou_min` on an early gate when the reference masks include parts that later gates add, and record why.
 
 A calibration gate is ready when each listed camera is calibrated, its RMS reprojection error is within `max_rms_px`, and its image, mask and correspondences are unchanged since solving.

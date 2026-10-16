@@ -14,6 +14,7 @@ DEFAULTS = {
     'recess': {'rim_step_mm': 0.05, 'protrusion_mm': 0.05, 'draft_min_deg': 3.0, 'fillet_min_mm': 5.0,
                'rim_weight': 0.999, 'exterior_normal_deg': 10.0},
     'mating': {'axis_deg': 0.1, 'centroid_mm': 0.05, 'skin_crossings_max': 0},
+    'detail': {'seat_mm': 1.0},
     'global': {'silhouette_iou_min': 0.90, 'delta_iou_min': 0.0, 'open_edges_max': 0,
                'uncovered_area_mm2_max': 0.0, 'cover_tolerance_mm': 3.0},
     'calibration': {'max_rms_px': 2.0},

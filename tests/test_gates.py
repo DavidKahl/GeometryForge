@@ -284,3 +284,24 @@ def test_migrate_to_format_three(project):
     p = projects.load(root)
     assert p['config']['format_version'] == 3 and p['state']['format_version'] == 3
     assert targets.migrate(root, 3)['status'] == 'unchanged'
+
+
+def test_final_gate_requires_a_detail_check(gated):
+    root, _ = gated
+    accept_master(root)
+    design_run(root)
+    accept(root, 'panels')
+    design_run(root)
+    blocked = gates.check(root, 'detail')
+    assert any('declares no detail check' in f for f in blocked['failures'])
+    contract = CONTRACT.replace('[targets.design]', """[checks.bolt_detail]
+kind = "detail"
+parts = ["bolt", "front"]
+[checks.bolt_detail.spec]
+parent = {part = "front"}
+features = [{part = "bolt"}]
+inventory = [{id = "bolts", feature = "bolt", min_count = 0}]
+[targets.design]""").replace('[gates.detail]\norder = 2\nparts = ["bolt"]\n',
+                                    '[gates.detail]\norder = 2\nparts = ["bolt"]\nchecks = ["bolt_detail"]\n')
+    (root / 'project.toml').write_text(contract, encoding='utf-8')
+    assert not any('declares no detail check' in f for f in gates.check(root, 'detail')['failures'])

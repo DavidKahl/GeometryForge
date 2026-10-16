@@ -335,3 +335,57 @@ def test_silhouette_requires_calibrated_mask(tmp_path):
     spec = {'test': 'silhouette_iou', 'camera': 'primary', 'targets': [{'part': 'hull', 'roles': ['guide']}]}
     with pytest.raises(ValueError, match='mask'):
         surface_checks.verify(payload(objects, 'global', spec, snapshot_root=str(tmp_path)))
+
+
+def bolt_row(xs, z0=-1.0, height=6.0, size=10.0, feature='bolt', name='Bolts', part='bolts'):
+    """Separate box islands (one per bolt) joined into one object, standing on the z=0 plane."""
+    meshes = []
+    for x in xs:
+        box = trimesh.creation.box([size, size, height])
+        box.apply_translation([x, 0, z0 + height / 2])
+        meshes.append(box)
+    joined = trimesh.util.concatenate(meshes)
+    return obj(name, part, joined.vertices, joined.faces, metadata={'feature': feature})
+
+
+def plate():
+    V, F = grid(lambda a, b: np.array([a, b, 0.0]), (-600, 600), (-200, 200), 25, 9)
+    return obj('Plate', 'panel', V, F)
+
+
+DETAIL = {'parent': {'part': 'panel'}, 'features': [{'part': 'bolts'}],
+          'inventory': [{'id': 'plate_bolts', 'feature': 'bolt', 'min_count': 8, 'relief_mm': [3, 12]}]}
+
+
+def test_detail_counts_seated_islands():
+    bolts = bolt_row(range(-525, 526, 150))  # 8 bolts
+    result = surface_checks.verify(payload([plate(), bolts], 'detail', DETAIL))
+    item = result['measurements']['items']['plate_bolts']
+    assert result['acceptance']['met'], result['acceptance']['failures']
+    assert item['count'] == 8 and item['floating'] == 0 and item['relief_mm'] == [5.0, 5.0]
+    assert result['measurements']['items_met'] == 1 and result['measurements']['feature_pieces'] == 8
+
+
+def test_missing_and_floating_detail_fail():
+    seated = bolt_row(range(-525, 0, 150))  # 4 bolts
+    loose = bolt_row([200, 350], z0=40.0, name='Loose')
+    result = surface_checks.verify(payload([plate(), seated, loose], 'detail', DETAIL))
+    failures = ' '.join(result['acceptance']['failures'])
+    assert not result['passed']
+    assert '6 bolt pieces, the inventory needs 8' in failures and '2 bolt pieces float' in failures
+    assert 'relief outside' in failures  # the floating bolts stand 46 mm off the skin
+    assert result['worst'][0]['metric'] == 'floating'
+
+
+def test_detail_regions_density_and_untracked_tags():
+    bolts = bolt_row(range(-525, 526, 150))
+    vents = bolt_row([0], feature='vent', name='Vent')
+    spec = {**DETAIL, 'inventory': [{'id': 'left_bolts', 'feature': 'bolt', 'min_count': 4, 'region_mm': [[-700, -300, -50], [0, 300, 50]],
+                                     'density_min_per_m2': 15.0}]}
+    result = surface_checks.verify(payload([plate(), bolts, vents], 'detail', spec))
+    item = result['measurements']['items']['left_bolts']
+    assert item['count'] == 4 and item['density_per_m2'] == pytest.approx(4 / 0.24, rel=1e-6)
+    assert result['acceptance']['met']
+    assert result['measurements']['untracked_tags'] == ['vent']
+    with pytest.raises(ValueError, match='inventory'):
+        surface_checks.verify(payload([plate(), bolts], 'detail', {**DETAIL, 'inventory': []}))

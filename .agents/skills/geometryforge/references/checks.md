@@ -4,7 +4,7 @@ A Boolean overlap only proves that two meshes touch. An agent can satisfy it by 
 
 ```toml
 [checks.seam_front_skirt]
-kind = "seam"                       # seam | recess | mating | global
+kind = "seam"                       # seam | recess | mating | global | detail
 parts = ["front_body", "skirt", "master_hull"]
 mode = "enforce"                    # enforce fails the run; measure records misses (gates still require them)
 [checks.seam_front_skirt.spec]
@@ -47,6 +47,31 @@ Fillet and draft are estimated from faces, so they depend on mesh density; revie
 ## mating: interface rings
 
 Spec: `parent` and `child` interface rings, optional `skin` and `child_solids`. **`lap_min_mm` and `lap_max_mm` are required per joint.** Measures the axis angle (default ≤0.1°), lateral centre offset (≤0.05 mm), engagement lap along the parent axis, and child edges piercing the exterior skin (0). Rings bound with `api.surf.bind_to_ring` pass by construction; the check catches later edits that move them.
+
+## detail: the inventory of real detail
+
+Surface checks reward clean surfaces, so detail can silently fall away while every check passes. A `detail` check makes the accepted detail inventory measurable.
+
+```toml
+[checks.detail_skirt]
+kind = "detail"
+parts = ["skirt", "fasteners"]
+[checks.detail_skirt.spec]
+parent = [{part = "skirt"}]                 # the skin the details sit on
+features = [{part = "fasteners"}]           # objects carrying metadata feature tags
+inventory = [
+  {id = "skirt_bolts", feature = "bolt", min_count = 60, relief_mm = [3, 12]},
+  {id = "left_vents", feature = "vent", min_count = 2, region_mm = [[-3000, 0, 0], [3000, 1500, 1200]], density_min_per_m2 = 0.5},
+]
+```
+
+- **Count:** each separate mesh island (after welding coincident vertices) of objects tagged `feature` counts once, so a joined bolt row of 60 heads counts 60. Tag objects with `register_output(..., feature="bolt")` or pass `feature=` to any `api.surf` detail primitive (`bolts` sets it by default).
+- **Seated:** every island needs a vertex within `seat_mm` (default 1.0) of the parent skin; floating parts fail with their locations.
+- **Relief:** optional `relief_mm` bounds each island's largest distance from the skin (height of a bolt, depth of a vent).
+- **Region and density:** `region_mm` limits an item to a box. `density_min_per_m2` divides the count by the parent skin area in that box.
+- `untracked_tags` lists feature tags present but missing from the inventory.
+
+The final geometry gate must declare at least one `detail` check, or `gate check` stays not ready. Build the inventory from the clean reference set (every region, with counts) and have the user accept it before Gate 1.
 
 ## global
 

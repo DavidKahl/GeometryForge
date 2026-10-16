@@ -13,7 +13,7 @@ from scipy.spatial import cKDTree
 from geometryforge.meshquery import TriangleIndex, as_mesh, edges, open_edges, sample_surface, vertex_normals
 from geometryforge.thresholds import resolve
 
-KINDS = ('seam', 'recess', 'mating', 'global')
+KINDS = ('seam', 'recess', 'mating', 'global', 'detail')
 GLOBAL_TESTS = ('silhouette_iou', 'open_edges', 'coverage')
 SURFACE_ROLES = ('design', 'high_detail')
 
@@ -542,6 +542,80 @@ def coverage(payload, limits, spec):
     return measurements, failures, worst(points, distance[uncovered], 10) if len(points) else []
 
 
+def islands(V, F, weld=1e-3):
+    """Connected mesh pieces after welding coincident vertices: one label per face."""
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+    keys = np.round(V / weld).astype(np.int64)
+    welded = np.unique(keys, axis=0, return_inverse=True)[1].ravel()
+    corners = welded[F]
+    pairs = np.concatenate((corners[:, [0, 1]], corners[:, [1, 2]]))
+    size = int(welded.max()) + 1
+    count, label = connected_components(coo_matrix((np.ones(len(pairs)), (pairs[:, 0], pairs[:, 1])), shape=(size, size)), directed=False)
+    return label[corners[:, 0]]
+
+
+def detail(payload, limits, spec):
+    """Inventory of real detail geometry: per item, count the mesh islands tagged with its feature, and require each
+    to sit on the parent skin (no floating parts) with relief inside the item's range."""
+    inventory = spec.get('inventory')
+    if not isinstance(inventory, list) or not inventory:
+        raise ValueError('Detail checks need an inventory list of {id, feature, min_count}')
+    listed = lambda value: value if isinstance(value, list) else [value]
+    SV, SF = surface([o for s in listed(spec.get('parent')) for o in select(payload, s, label='parent')])
+    skin = TriangleIndex(SV, SF)
+    candidates = [o for s in listed(spec.get('features')) for o in select(payload, s, label='features')]
+    tags = {o.get('metadata', {}).get('feature') for o in candidates} - {None}
+    measurements, failures, report = {'items': {}}, [], []
+    for item in inventory:
+        ident, tag, needed = item.get('id'), item.get('feature'), item.get('min_count', 1)
+        if not ident or not tag or type(needed) is not int or needed < 0:
+            raise ValueError('Each inventory item needs an id, a feature tag and an integer min_count')
+        objects = [o for o in candidates if o.get('metadata', {}).get('feature') == tag]
+        V, F = as_mesh(objects) if objects else (np.zeros((0, 3)), np.zeros((0, 3), dtype=np.int64))
+        pieces = []
+        if len(F):
+            label = islands(V, F)
+            for value in np.unique(label):
+                pieces.append(V[np.unique(F[label == value])])
+        region = item.get('region_mm')
+        if region:
+            low, high = np.min(region, axis=0), np.max(region, axis=0)
+            pieces = [v for v in pieces if ((v.mean(axis=0) >= low) & (v.mean(axis=0) <= high)).all()]
+        seat, relief = [], []
+        for v in pieces:
+            seat.append(float(skin.closest(v)[0].min()))
+            relief.append(float(np.abs(skin.signed_distance(v)[0]).max()))
+        floating = [i for i, d in enumerate(seat) if d > limits['seat_mm']]
+        lo, hi = item.get('relief_mm', [0.0, math.inf])
+        outside = [i for i, r in enumerate(relief) if not lo <= r <= hi]
+        entry = {'feature': tag, 'count': len(pieces), 'min_count': needed, 'floating': len(floating), 'relief_outside': len(outside)}
+        if relief:
+            entry['relief_mm'] = [round(min(relief), 3), round(max(relief), 3)]
+        if item.get('density_min_per_m2') is not None:
+            centres = SV[SF].mean(axis=1)
+            inside = np.ones(len(SF), dtype=bool) if not region else ((centres >= low) & (centres <= high)).all(axis=1)
+            a, b, c = (SV[SF[inside, k]] for k in range(3))
+            area = float(np.linalg.norm(np.cross(b - a, c - a), axis=1).sum() / 2e6)
+            entry['density_per_m2'] = len(pieces) / area if area else 0.0
+            if entry['density_per_m2'] < item['density_min_per_m2']:
+                failures.append(f'{ident}: {entry["density_per_m2"]:.2f} {tag} pieces per m2, needs {item["density_min_per_m2"]}')
+        measurements['items'][ident] = entry
+        if len(pieces) < needed:
+            failures.append(f'{ident}: {len(pieces)} {tag} pieces, the inventory needs {needed}')
+        if floating:
+            failures.append(f'{ident}: {len(floating)} {tag} pieces float more than {limits["seat_mm"]} mm off the skin')
+            report += [{'metric': 'floating', 'item': ident, 'location_mm': np.round(pieces[i].mean(axis=0), 1).tolist(), 'value': seat[i]}
+                       for i in floating[:5]]
+        if outside:
+            failures.append(f'{ident}: {len(outside)} {tag} pieces have relief outside {lo}-{hi} mm')
+    measurements['inventory_items'] = len(inventory)
+    measurements['items_met'] = sum(1 for e in measurements['items'].values() if e['count'] >= e['min_count'] and not e['floating'] and not e['relief_outside'])
+    measurements['feature_pieces'] = sum(e['count'] for e in measurements['items'].values())
+    measurements['untracked_tags'] = sorted(tags - {i['feature'] for i in inventory})
+    return measurements, failures, report
+
+
 def verify(payload):
     kind = payload.get('kind')
     if kind not in KINDS:
@@ -555,7 +629,7 @@ def verify(payload):
         measurements, failures, report = {'silhouette_iou': silhouette, 'open_edges': open_edge_test, 'coverage': coverage}[test](payload, limits, spec)
         measurements['test'] = test
     else:
-        measurements, failures, report = {'seam': seam, 'recess': recess, 'mating': mating}[kind](payload, limits, spec)
+        measurements, failures, report = {'seam': seam, 'recess': recess, 'mating': mating, 'detail': detail}[kind](payload, limits, spec)
     mode = payload.get('mode', 'enforce')
     met = not failures
     return {'passed': met or mode == 'measure', 'kind': kind, 'mode': mode, 'thresholds': limits,

@@ -234,6 +234,11 @@ def check(root, name):
         evidence['calibration'] = {'cameras': recorded, 'cameras_sha256': digest(p['root'] / 'references/cameras.json')
                                    if (p['root'] / 'references/cameras.json').is_file() else None, 'max_rms_px': limit}
         return {'gate': name, 'ready': not failures, 'failures': failures, 'evidence': evidence}
+    final = max((spec['order'] for _, spec in ordered(p) if spec['kind'] == 'geometry'), default=None)
+    if gate['order'] == final and not any(p['config'].get('checks', {}).get(c, {}).get('kind') == 'detail' for c in gate.get('checks', [])):
+        # Surface checks alone let detail silently fall away; the last geometry gate must measure it.
+        failures.append(f'Final geometry gate {name} declares no detail check; add a kind = "detail" check with the accepted '
+                        'detail inventory (see the skill reference checks.md)')
     gate_route = route(p)
     view = targets.baseline_view(p, gate_route)
     safe = view['state'].get('safe_point')
