@@ -49,9 +49,11 @@ def test_gated_master_hull_workflow(tmp_path, monkeypatch):
     gates.accept(root, 'panels', 'native test', 'fixture acceptance')
 
     detail = design(root)
-    measured = met(detail, 'recess_lamp', 'mating_lens')
+    measured = met(detail, 'recess_lamp', 'mating_lens', 'detail_fasteners')
     assert measured['recess_lamp']['proud_vertices'] == 0
     assert measured['mating_lens']['skin_crossings'] == 0
+    bolts = measured['detail_fasteners']['items']['roof_bolts']
+    assert bolts['count'] == 6 and bolts['floating'] == 0 and 3 <= bolts['relief_mm'][0]
     assert gates.status(root)['active_gate'] == 'detail'
 
     again = design(root, source='scene')

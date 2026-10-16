@@ -26,6 +26,11 @@ sources = ["models/blender.py"]
 parameters = ["lens_lap_mm"]
 depends = ["body"]
 
+[parts.fasteners]
+sources = ["models/blender.py"]
+parameters = ["bolt_count"]
+depends = ["body"]
+
 [checks.master_closed]
 kind = "global"
 parts = ["master_hull"]
@@ -79,6 +84,14 @@ child_solids = [{part = "lens", objects = ["Lens"]}]
 lap_min_mm = 4.5
 lap_max_mm = 5.5
 
+[checks.detail_fasteners]
+kind = "detail"
+parts = ["body", "fasteners"]
+[checks.detail_fasteners.spec]
+parent = {part = "body", objects = ["Body panel"]}
+features = [{part = "fasteners"}]
+inventory = [{id = "roof_bolts", feature = "bolt", min_count = 6, relief_mm = [3, 12]}]
+
 [targets.design]
 
 [targets.game]
@@ -99,5 +112,5 @@ checks = ["seam_body_skirt", "coverage_hull"]
 
 [gates.detail]
 order = 2
-parts = ["lens"]
-checks = ["recess_lamp", "mating_lens"]
+parts = ["lens", "fasteners"]
+checks = ["recess_lamp", "mating_lens", "detail_fasteners"]

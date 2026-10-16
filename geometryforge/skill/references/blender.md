@@ -11,9 +11,17 @@ For compound curved reference geometry use [surface modeling](surface-modeling.m
 - `inset_panel_perimeter(panel, distance, gap)`, `tighten_panel_corners(panel, corner_mm)`, `tighten_opening(panel, opening, corner_mm)` and `build_guide_mesh_stack(panel, guide, thickness, bevel_width, subsurf_levels)`.
 - Toolkit helpers are not part inputs: after changing one, rebuild with `run --parts ...` (or `--full`). A plain run, even with `--source code`, re-evaluates the saved scene when no project input changed.
 - `recessed_pocket_extrude(panel, loop, depth, draft_angle_deg, fillet_mm)`: weights `guide_bound` and `gf_pocket`, and stores the pull axis.
-- `extract_interface_ring(obj, loop, name)` and `local_ring(name, radius)`: edge-only `interface` role objects.
+- `extract_interface_ring(obj, loop, name)` and `local_ring(name, radius, z=0, axis=(0, 0, 1))`: edge-only `interface` role objects.
 - `ring_frame`, `bind_to_ring(child, ring, lap, interfaces)` and `project_detail(obj, parent)`.
 - `patch`, `loft`, `sweep` and `mesh_object`, plus `feature_curves(features.json)`.
+- Detail primitives, each an editable object that accepts `feature="..."` for detail checks:
+  - `fillet(profile, radius)` rounds 2D profile corners;
+  - `lathe(name, profile, radius=, arc=)` is a filleted solid of revolution, or a sector of one;
+  - `rounded_box` and `prism(outline, z0, z1)` carry an angle-limited Bevel modifier;
+  - `bolts(name, points, normals)` makes hex heads, one island each, tagged `bolt`;
+  - `ribbed_tube(name, path, radius)` builds hoses and conduits;
+  - `pane(name, seat_ring, guide)` fills a seat ring with curved glass or a lens set back by the seat depth;
+  - `seat_on_surface(obj, target)` drops a base plate onto a crowned panel.
 
 Recipes receive parts dependencies-first, so a dependent part can look up objects built by the parts it declares in `depends`.
 

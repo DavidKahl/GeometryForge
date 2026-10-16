@@ -145,6 +145,166 @@ class Surfacing:
             rings.append(rings[0])
         return self.loft(name, rings, caps=not cyclic, role=role, **metadata)
 
+    # Detail primitives --------------------------------------------------------------------
+    # Every primitive returns an editable mesh object; pass feature='bolt' (etc.) so detail checks can count it.
+    @staticmethod
+    def fillet(profile, radius, segments=4):
+        """Round each interior corner of an open 2D polyline; radius is a number or one per point (0 keeps the corner)."""
+        points = [np.asarray(p, dtype=float) for p in profile]
+        radii = list(radius) if isinstance(radius, (list, tuple)) else [radius] * len(points)
+        out = [points[0]]
+        for i in range(1, len(points) - 1):
+            p, a, b = points[i], points[i - 1], points[i + 1]
+            u, v = a - p, b - p
+            lu, lv = np.linalg.norm(u), np.linalg.norm(v)
+            u, v = u / lu, v / lv
+            half = math.acos(max(-1.0, min(1.0, float(u @ v)))) / 2
+            if radii[i] <= 0 or half > math.radians(89):
+                out.append(p)
+                continue
+            setback = min(radii[i] / math.tan(half), lu * .45, lv * .45)
+            start, end = p + u * setback, p + v * setback
+            out += [(1 - t) ** 2 * start + 2 * (1 - t) * t * p + t ** 2 * end for t in np.linspace(0, 1, segments + 1)]
+        out.append(points[-1])
+        return [tuple(map(float, q)) for q in out]
+
+    def _closed(self, obj):
+        import bmesh
+        bm = bmesh.new()
+        bm.from_mesh(obj.data)
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+        bm.to_mesh(obj.data)
+        bm.free()
+        obj.data.update()
+        return obj
+
+    def _rounded(self, obj, width, segments=3):
+        if width:
+            mod = obj.modifiers.new('Edge rounding', 'BEVEL')
+            mod.width, mod.segments, mod.limit_method, mod.angle_limit = width, segments, 'ANGLE', math.radians(30)
+            obj.modifiers.new('Feature shading', 'WEIGHTED_NORMAL').keep_sharp = True
+        return obj
+
+    def lathe(self, name, profile, segments=64, radius=0.0, arc=None, role='design', **metadata):
+        """Closed solid of revolution about local Z from an (r, z) profile; radius fillets its corners; arc=(a0, a1)
+        degrees builds a sector (for example one segment of a segmented light band)."""
+        points = self.fillet(profile, radius) if radius else [tuple(map(float, p)) for p in profile]
+        if arc is None:
+            angles = np.linspace(0, 2 * math.pi, segments, endpoint=False)
+            rings = [[(r * math.cos(a), r * math.sin(a), z) for a in angles] for r, z in points]
+        else:
+            angles = np.radians(np.linspace(arc[0], arc[1], segments))
+            rings = [[(r * math.cos(a), r * math.sin(a), z) for r, z in points] for a in angles]
+        return self._closed(self.loft(name, rings, caps=True, role=role, **metadata))
+
+    def rounded_box(self, name, size, centre=(0.0, 0.0, 0.0), bevel=3.0, role='design', **metadata):
+        """Box with an angle-limited Bevel modifier, so no raw 90-degree edge reaches the render."""
+        x, y, z = (float(v) / 2 for v in size)
+        verts = [(sx * x + centre[0], sy * y + centre[1], sz * z + centre[2]) for sx in (-1, 1) for sy in (-1, 1) for sz in (-1, 1)]
+        faces = [(0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)]
+        return self._rounded(self._closed(self.mesh_object(name, verts, faces, role, **metadata)), bevel)
+
+    def prism(self, name, outline, z0, z1, bevel=3.0, role='design', **metadata):
+        """Closed 2D outline (local XY) extruded from z0 to z1, edges rounded by a Bevel modifier."""
+        rings = [[(float(x), float(y), float(z0)) for x, y in outline], [(float(x), float(y), float(z1)) for x, y in outline]]
+        return self._rounded(self._closed(self.loft(name, rings, caps=True, role=role, **metadata)), bevel)
+
+    def bolts(self, name, points, normals, radius=9.0, height=6.0, sink=2.0, sides=6, role='design', **metadata):
+        """Hex bolt heads, one separate island per point, standing along each surface normal (sink below the skin)."""
+        metadata.setdefault('feature', 'bolt')
+        verts, faces = [], []
+        for point, normal in zip(np.asarray(points, dtype=float), np.asarray(normals, dtype=float)):
+            n = normal / np.linalg.norm(normal)
+            u = np.cross(n, [0.0, 0.0, 1.0] if abs(n[2]) < .9 else [1.0, 0.0, 0.0])
+            u /= np.linalg.norm(u)
+            v = np.cross(n, u)
+            base = len(verts)
+            for h, r in ((-sink, radius), (height, radius * .9)):
+                for k in range(sides):
+                    a = 2 * math.pi * k / sides
+                    verts.append(tuple(point + n * h + (u * math.cos(a) + v * math.sin(a)) * r))
+            faces.append(tuple(base + k for k in reversed(range(sides))))
+            faces.append(tuple(base + sides + k for k in range(sides)))
+            faces += [(base + k, base + (k + 1) % sides, base + sides + (k + 1) % sides, base + sides + k) for k in range(sides)]
+        return self._closed(self.mesh_object(name, verts, faces, role, smooth=False, **metadata))
+
+    def ribbed_tube(self, name, path, radius, rib=4.0, pitch=24.0, sides=14, role='design', **metadata):
+        """Tube along a polyline with ribs every half pitch (service hoses, ribbed conduits)."""
+        path = np.asarray(path, dtype=float)
+        lengths = np.r_[0, np.cumsum(np.linalg.norm(np.diff(path, axis=0), axis=1))]
+        steps = max(4, int(lengths[-1] / (pitch / 2)))
+        t = np.linspace(0, lengths[-1], steps + 1)
+        points = np.column_stack([np.interp(t, lengths, path[:, i]) for i in range(3)])
+        tangents = np.gradient(points, axis=0)
+        tangents /= np.linalg.norm(tangents, axis=1)[:, None]
+        normal = np.cross(tangents[0], [0, 0, 1] if abs(tangents[0][2]) < .9 else [1, 0, 0])
+        normal /= np.linalg.norm(normal)
+        rings = []
+        for i, (centre, tangent) in enumerate(zip(points, tangents)):
+            normal = normal - tangent * (normal @ tangent)
+            normal /= np.linalg.norm(normal)
+            binormal = np.cross(tangent, normal)
+            r = radius + (rib if i % 2 else 0.0)
+            rings.append([tuple(centre + r * (normal * math.cos(2 * math.pi * k / sides) + binormal * math.sin(2 * math.pi * k / sides)))
+                          for k in range(sides)])
+        return self._closed(self.loft(name, rings, caps=True, role=role, **metadata))
+
+    def pane(self, name, seat, guide, rings=6, expand=2.0, thickness=6.0, role='design', **metadata):
+        """Curved pane filling a seat interface ring: inner rings follow the guide surface offset by the seat depth,
+        the outer ring is the seat itself grown by `expand` so the edge tucks under the pocket wall. Solidify uses
+        simple offset (even offset explodes at the fan centre) and grows away from the ring's outward axis."""
+        bpy = _bpy()
+        graph = bpy.context.evaluated_depsgraph_get()
+        inverse, rotation = guide.matrix_world.inverted(), guide.matrix_world.to_3x3()
+
+        def query(point):
+            hit, location, normal, _ = guide.closest_point_on_mesh(inverse @ _vector(point), depsgraph=graph)
+            if not hit:
+                raise ValueError(f'{name}: no guide surface near the seat')
+            return np.array(guide.matrix_world @ location), np.array((rotation @ normal).normalized())
+        world = np.array([seat.matrix_world @ v.co for v in seat.data.vertices], dtype=float)
+        edge = world[_cycle([e.vertices[:] for e in seat.data.edges])]
+        centre = edge.mean(axis=0)
+        depth = float(np.mean([(query(q)[0] - q) @ query(q)[1] for q in edge]))
+        loops = []
+        for f in np.linspace(1.0, .08, rings):
+            loop = []
+            for q in edge:
+                if f == 1.0:
+                    outward = (q - centre) / np.linalg.norm(q - centre)
+                    loop.append(tuple(q + outward * expand))
+                else:
+                    location, normal = query(centre + f * (q - centre))
+                    loop.append(tuple(location - normal * depth))
+            loops.append(loop)
+        obj = self._closed(self.loft(name, loops, caps=True, role=role, **metadata))
+        _, axis, _ = self.ring_frame(seat)
+        normal = np.mean([np.array(poly.normal) for poly in obj.data.polygons], axis=0)
+        solid = obj.modifiers.new('Pane thickness', 'SOLIDIFY')
+        solid.thickness, solid.use_even_offset = thickness, False
+        solid.offset = -1.0 if normal @ axis > 0 else 1.0
+        return obj
+
+    def seat_on_surface(self, obj, target, sink=4.0, direction=(0.0, 0.0, -1.0)):
+        """Drop the lowest layer of an object's vertices along direction onto the evaluated target (minus sink), so a
+        base plate follows a crowned panel instead of floating or cutting into it."""
+        bpy = _bpy()
+        graph = bpy.context.evaluated_depsgraph_get()
+        d = np.asarray(direction, dtype=float)
+        d /= np.linalg.norm(d)
+        inverse, mw = target.matrix_world.inverted(), obj.matrix_world
+        heights = [float(np.asarray(mw @ v.co) @ d) for v in obj.data.vertices]
+        lowest = max(heights)
+        for v, h in zip(obj.data.vertices, heights):
+            if h < lowest - .5:
+                continue
+            start = np.asarray(mw @ v.co, dtype=float) - d * 5000.0
+            hit, location, _, _ = target.ray_cast(inverse @ _vector(start), (inverse.to_3x3() @ _vector(d)).normalized(), depsgraph=graph)
+            if hit:
+                v.co = mw.inverted() @ _vector(np.asarray(target.matrix_world @ location) + d * sink)
+        obj.data.update()
+        return obj
+
     # Master hull and panels ---------------------------------------------------------------
     def master_hull(self, name, verts, faces, regions=None, creases=None, levels=4, output_id=None):
         """One watertight low-poly cage; regions name face sets for panels and openings; creases replace support loops."""
@@ -580,11 +740,13 @@ class Surfacing:
         self.api.register_output(ring, output_id, 'interface', axis=axis.tolist(), loop=loop_id, source=obj.name, **extra)
         return ring
 
-    def local_ring(self, name, radius, segments=48, output_id=None):
-        """Child-side interface circle in local XY (axis +Z); bind_to_ring moves it with its child."""
-        points = [(radius * math.cos(2 * math.pi * k / segments), radius * math.sin(2 * math.pi * k / segments), 0.0) for k in range(segments)]
+    def local_ring(self, name, radius, segments=48, output_id=None, z=0.0, axis=(0.0, 0.0, 1.0)):
+        """Child-side interface circle in local XY at height z; bind_to_ring moves it with its child.
+
+        axis is the ring's outward direction in local space; give it the parent ring's outward sense after binding."""
+        points = [(radius * math.cos(2 * math.pi * k / segments), radius * math.sin(2 * math.pi * k / segments), float(z)) for k in range(segments)]
         ring = self.mesh_object(name, points, [], role=None, smooth=False, edges=[(k, (k + 1) % segments) for k in range(segments)])
-        return self.api.register_output(ring, output_id, 'interface', axis=[0.0, 0.0, 1.0], loop=name)
+        return self.api.register_output(ring, output_id, 'interface', axis=[float(a) for a in axis], loop=name)
 
     def ring_frame(self, ring):
         """World centroid, outward axis and mean radius of an interface ring."""

@@ -55,3 +55,16 @@ def build_parts(parameters, parts, api):
             lens = s.loft('Lens', rings)
             ring = s.local_ring('_interface_lens', 30.0)
             s.bind_to_ring(lens, bpy.data.objects['_interface_lamp_seat'], lap=parameters['lens_lap_mm'], interfaces=[ring])
+        elif part == 'fasteners':
+            # A bolt row along the roof crown, seated on the evaluated body panel it is bolted to (the panel sags
+            # a few mm below the master between cage vertices; detail checks measure seating against the panel).
+            from mathutils import Vector
+            guide = bpy.data.objects['Body panel']
+            graph = bpy.context.evaluated_depsgraph_get()
+            points, normals = [], []
+            for k in range(parameters['bolt_count']):
+                x = -0.3 * parameters['length_mm'] + 0.6 * parameters['length_mm'] * k / max(parameters['bolt_count'] - 1, 1)
+                hit, location, normal, _ = guide.ray_cast(Vector((x, 0.0, 2 * parameters['height_mm'])), Vector((0, 0, -1)), depsgraph=graph)
+                points.append(tuple(location))
+                normals.append(tuple(normal))
+            s.bolts('Roof bolts', points, normals, radius=8.0, height=6.0)
