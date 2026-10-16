@@ -275,13 +275,36 @@ class Surfacing:
         return obj
 
     def build_guide_mesh_stack(self, panel, guide, vgroup='guide_bound', thickness=3.0, bevel_width=0.6,
-                               subsurf_levels=2, wrap_method='NEAREST_SURFACEPOINT', bevel_segments=2):
-        """SUBSURF -> SHRINKWRAP(master, vertex group) -> SOLIDIFY(inward) -> BEVEL(weight)."""
+                               subsurf_levels=2, wrap_method='NEAREST_SURFACEPOINT', bevel_segments=2, corner_crease=1.0):
+        """SUBSURF -> SHRINKWRAP(master, vertex group) -> SOLIDIFY(inward) -> BEVEL(weight).
+
+        corner_crease sharpens the panel outline where its outer border turns: subdivision would otherwise round
+        every corner of a sparse cage over a long distance and open the seams toward their ends. Opening loops
+        keep smooth corners; their pockets shape them.
+        """
         import bmesh
         bm = bmesh.new()
         bm.from_mesh(panel.data)
         strips = [e.calc_length() for e in bm.edges if not e.is_boundary and any(v.is_boundary for v in e.verts)]
+        corners = []
+        if corner_crease:
+            bm.normal_update()
+            deform = bm.verts.layers.deform.verify()
+            loops = [g.index for g in panel.vertex_groups if g.name.startswith('gf_loop_')]
+            for v in bm.verts:
+                edges = [e for e in v.link_edges if e.is_boundary]
+                if len(edges) != 2 or any(v[deform].get(g, 0) > .5 for g in loops):
+                    continue
+                # Turn measured in the surface's tangent plane: a border wrapping around a curved hull stays
+                # straight on the surface even where it bends in space.
+                a, b = (d - v.normal * d.dot(v.normal) for d in (e.other_vert(v).co - v.co for e in edges))
+                if a.length > 1e-6 and b.length > 1e-6 and a.angle(b) < math.radians(150):
+                    corners.append(v.index)
         bm.free()
+        if corners:
+            layer = panel.data.attributes.get('crease_vert') or panel.data.attributes.new('crease_vert', 'FLOAT', 'POINT')
+            for index in corners:
+                layer.data[index].value = corner_crease
         if strips and min(strips) / 2 ** subsurf_levels < bevel_width * 1.25:
             raise ValueError(f'{panel.name}: the border control strip subdivides to {min(strips) / 2 ** subsurf_levels:.2f} mm, '
                              f'too narrow for a {bevel_width} mm bevel; widen inset_panel_perimeter or lower the levels')
@@ -289,6 +312,7 @@ class Surfacing:
             _group(panel, name)
         sub = panel.modifiers.new('Panel smoothing', 'SUBSURF')
         sub.levels = sub.render_levels = subsurf_levels
+        sub.use_creases = True
         wrap = panel.modifiers.new('Master surface lock', 'SHRINKWRAP')
         wrap.target, wrap.wrap_method, wrap.vertex_group = guide, wrap_method, vgroup
         solid = panel.modifiers.new('Panel thickness', 'SOLIDIFY')

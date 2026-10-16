@@ -78,6 +78,20 @@ def test_staggered_coarse_borders_measure_the_true_gap():
     assert 2.9 < m['gap_min_mm'] <= m['gap_max_mm'] < 3.2
 
 
+def test_skin_border_sits_where_the_normal_limit_is_crossed():
+    # A border vertex flat on the master (0 deg) next to a bevel vertex at 20 deg: the 10 deg limit is crossed halfway.
+    V = np.array([[0.0, 0, 0], [10, 0, 0], [0, 10, 0], [10, 10, 0]])
+    F = np.array([[0, 1, 3], [0, 3, 2]])
+    tilt = np.radians(20)
+    normals = np.array([[0, 0, 1.0], [math.sin(tilt), 0, math.cos(tilt)], [0, 0, 1.0], [math.sin(tilt), 0, math.cos(tilt)]])
+    mnormal = np.tile([0, 0, 1.0], (4, 1))
+    mask = np.array([True, False, True, False])
+    limits = {'exterior_normal_deg': 10.0, 'exterior_band_mm': 1.0}
+    P = surface_checks.skin_edge_positions(V, F, mask, np.zeros(4), normals, mnormal, np.array([0, 2]), limits)
+    np.testing.assert_allclose(P[[0, 2], 0], [5.0, 5.0])
+    np.testing.assert_allclose(P[[1, 3]], V[[1, 3]])
+
+
 def test_stepped_seam_fails_with_locations():
     result = surface_checks.verify(payload(seam_scene(lift=1.0), 'seam', SEAM))
     assert not result['passed']

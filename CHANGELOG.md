@@ -33,6 +33,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- **Panel corners stay sharp:** `build_guide_mesh_stack(corner_crease=1.0)` puts a vertex crease where a panel's outer border turns in the surface's tangent plane. Subdivision no longer rounds sparse panel corners over a long distance and opens seams toward their ends. Opening loops keep smooth corners.
+- **Seam gap at the visible edge:** the skin border sits where the normal limit is crossed along the edge that runs most nearly across the border, independent of how coarse or skewed the subdivided strip is. Step and curvature still compare the flush skin vertices.
 - **Seam gap on staggered borders:** seam checks pair each border vertex with the nearest point on the other panel's border edges and measure the gap to that point. Coarse or differently subdivided borders no longer drop out of pairing or count their along-seam offset as gap. Border vertices whose gap vector runs along their own border (panel corners) are excluded.
 
 - Recipes now receive parts dependencies-first. Alphabetical order could build a dependent part against geometry that its dependency's rebuild then deleted.

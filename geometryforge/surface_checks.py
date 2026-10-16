@@ -85,13 +85,49 @@ def exterior(V, F, master, limits, objects):
     return mask, sd, normals, mnormal
 
 
-def closest_on_border(side, vertices, points):
+def skin_edge_positions(V, F, mask, sd, normals, mnormal, border, limits, border_edges=None):
+    """Border vertices moved to where the skin's normal limit is actually crossed along each outgoing edge.
+
+    The skin ends at the last vertex whose normal is within exterior_normal_deg of the master; where the
+    subdivided strip is coarse or skewed that vertex can sit several mm inside the visible edge. Interpolating
+    the normal angle along the edge toward the first rejected vertex (bevel roll-off, still near the master)
+    places the border at the visible edge independent of mesh resolution.
+    """
+    P = np.asarray(V, dtype=float).copy()
+    if not len(border):
+        return P
+    angle = np.degrees(np.arccos(np.clip(np.einsum('ij,ij->i', normals, mnormal), -1.0, 1.0)))
+    limit = limits['exterior_normal_deg']
+    edges = np.unique(np.sort(np.concatenate([F[:, [k, (k + 1) % F.shape[1]]] for k in range(F.shape[1])]), axis=1), axis=0)
+    edges = np.concatenate([edges, edges[:, ::-1]])
+    on_border = np.zeros(len(V), dtype=bool)
+    on_border[border] = True
+    u, w = edges[:, 0], edges[:, 1]
+    keep = on_border[u] & ~mask[w] & (sd[w] > -limits['exterior_band_mm']) & (angle[w] > angle[u])
+    u, w = u[keep], w[keep]
+    t = np.clip((limit - angle[u]) / (angle[w] - angle[u]), 0.0, 1.0)
+    crossing = V[u] + t[:, None] * (V[w] - V[u])  # a real surface point where the limit is crossed
+    if border_edges is not None and len(border_edges):
+        # Per vertex, the edge running most nearly across the border; diagonals would slide the edge along the seam.
+        direction = V[w] - V[u]
+        direction /= np.maximum(np.linalg.norm(direction, axis=1), 1e-12)[:, None]
+        tangents = border_tangents({'V': np.asarray(V, dtype=float), 'border_edges': border_edges}, u)
+        rank = -np.abs(np.einsum('ij,ij->i', direction, tangents))
+    else:
+        rank = np.linalg.norm(crossing - V[u], axis=1)
+    for index in np.argsort(rank):  # the best-ranked edge per vertex is written last and wins
+        P[u[index]] = crossing[index]
+    return P
+
+
+def closest_on_border(side, vertices, points, key='P'):
     """Closest points on the border edges incident to each paired vertex.
 
     Paired vertices are staggered along the seam when the two panels subdivide their borders differently;
-    measuring vertex to vertex would count that along-seam offset as gap.
+    measuring vertex to vertex would count that along-seam offset as gap. key 'P' uses the visible skin edge
+    (skin_edge_positions), 'V' the skin's own border vertices.
     """
-    V, edges = side['V'], np.asarray(side['border_edges'])
+    V, edges = side[key], np.asarray(side['border_edges'])
     result = V[vertices].copy()
     best = np.linalg.norm(result - points, axis=1)
     for column in (0, 1):
@@ -134,7 +170,9 @@ def seam(payload, limits, spec):
         if len(skin):
             # Skin-only normals: border vertices must not average in the bevel roll-off.
             normals = np.where(mask[:, None], vertex_normals(V, skin), normals)
-        sides[key] = dict(V=V, sd=sd, normals=normals, mnormal=mnormal, mask=mask, border=border, border_edges=border_edges, skin=skin,
+        full_normals = vertex_normals(V, F)
+        sides[key] = dict(V=V, P=skin_edge_positions(V, F, mask, sd, full_normals, mnormal, border, limits, border_edges), sd=sd, normals=normals,
+                          mnormal=mnormal, mask=mask, border=border, border_edges=border_edges, skin=skin,
                           index=TriangleIndex(V, skin) if len(skin) else None)
     a, b = sides['a'], sides['b']
     deviation = np.concatenate([np.abs(s['sd'][s['mask']]) for s in (a, b)])
@@ -153,12 +191,12 @@ def seam(payload, limits, spec):
         # vertices, keep coarse or staggered borders paired; borders running away from the seam stay out of reach.
         reach = 2 * limits['gap_max_mm'] + 2
         edges = np.asarray(b['border_edges'])
-        longest = float(np.linalg.norm(b['V'][edges[:, 0]] - b['V'][edges[:, 1]], axis=1).max()) if len(edges) else 0.0
-        _, nearest = cKDTree(b['V'][b['border']]).query(a['V'][a['border']], distance_upper_bound=reach + longest)
+        longest = float(np.linalg.norm(b['P'][edges[:, 0]] - b['P'][edges[:, 1]], axis=1).max()) if len(edges) else 0.0
+        _, nearest = cKDTree(b['P'][b['border']]).query(a['P'][a['border']], distance_upper_bound=reach + longest)
         found = np.nonzero(nearest < len(b['border']))[0]
         if len(found):
             i, j = a['border'][found], b['border'][nearest[found]]
-            across = closest_on_border(b, j, a['V'][i]) - a['V'][i]
+            across = closest_on_border(b, j, a['P'][i]) - a['P'][i]
             length = np.linalg.norm(across, axis=1)
             # A seam gap crosses a's own border; along it lie borders that only meet at a corner.
             crossing = np.abs(np.einsum('ij,ij->i', across / np.maximum(length, 1e-9)[:, None], border_tangents(a, i))) < .5
@@ -169,14 +207,17 @@ def seam(payload, limits, spec):
         failures.append(f'No shared seam between {spec["a"]} and {spec["b"]}: {len(pairs)} paired border vertices')
         return measurements, failures, report
     i, j = np.asarray([x for x, _ in pairs]), np.asarray([y for _, y in pairs])
+    # Step compares the flush skins themselves; the gap spans the visible edges, which may lie on the bevel roll-off.
     p = a['V'][i]
-    q = closest_on_border(b, j, p)
+    q = closest_on_border(b, j, p, key='V')
     middle = (p + q) / 2
     _, _, mnorm, _ = master.signed_distance(middle)
     delta = q - p
     step = np.abs(np.einsum('ij,ij->i', delta, mnorm))
-    across = delta - np.einsum('ij,ij->i', delta, mnorm)[:, None] * mnorm
+    visible = closest_on_border(b, j, a['P'][i]) - a['P'][i]
+    across = visible - np.einsum('ij,ij->i', visible, mnorm)[:, None] * mnorm
     gap = np.linalg.norm(across, axis=1)
+    across = delta - np.einsum('ij,ij->i', delta, mnorm)[:, None] * mnorm
     g1 = np.maximum(angle(a['normals'][i], b['normals'][j]) - angle(a['mnormal'][i], b['mnormal'][j]), 0)
 
     def curvature(side, index, away):
@@ -189,7 +230,7 @@ def seam(payload, limits, spec):
         turn = np.radians(angle(side['normals'][index], normal))
         return np.where(length > 1e-6, turn / np.maximum(length, 1e-6), 0)
 
-    unit = across / np.maximum(gap, 1e-9)[:, None]
+    unit = across / np.maximum(np.linalg.norm(across, axis=1), 1e-9)[:, None]
     ka, kb = curvature(a, i, -unit), curvature(b, j, unit)
     # Relative curvature mismatch, floored at a reference curvature: two nearly flat sides (R of
     # metres) differ only by discretization noise and are compared against the floor instead.
