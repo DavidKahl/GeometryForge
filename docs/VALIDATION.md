@@ -2,6 +2,34 @@
 
 What has actually been verified, on what, and when. Nothing here claims a physical print. Native validation has only been done on Windows.
 
+## Gated hover taxi rebuild (16 October 2026, branch `hover-taxi-gated`)
+
+A real-project run of the format 3 gates in Blender 5.2.1 LTS (`projects/hover_taxi_gated`, design route only). Every gate was accepted by the user after its blind review. Native runs, in order:
+
+- **Gate 0 calibration:** `geometryforge calibrate` on the primary and profile references. The primary solved at 10.9 px RMS from seven datums; the user set a 12 px limit, recorded with its reason. The nose and headlamp corners were dropped as datums because they are different 3D points in the two generated views.
+- **Gate 1 master hull:** a closed body cage and two nacelle masters, 0 open edges. Silhouette IoU is 0.830 (primary) and 0.817 (profile) against a user limit of 0.80 for the master alone. Gate 1 was later reopened by the user to move the nacelle sockets to the rear face, and re-accepted.
+- **Gate 2 panels:** 18 body panels, 12 skirt plates and bumpers, the belly and the nacelle armour, all sliced from the masters.
+  - Seam gaps 1.8-4.1 mm (skirt 5.4-7.0 mm), steps at most 0.009 mm, tangent break p95 at most 0.03 deg on painted seams (skirt 1.09 deg).
+  - Seven pocket checks with at most 0.104 mm protrusion; coverage complete within 9 mm.
+  - Re-accepted after the socket move.
+- **Gate 3 detail:** pads (one mesh, four linked placements), nacelle drive, glass, lamp and exhaust inserts, roof equipment and interior.
+  - Ten mating checks exactly on axis and centre, with 0 skin crossings. Laps: pad bosses 40 mm, drum flanges 15 mm, shafts 80 mm, couplings 10 mm.
+  - Five recess-contents checks with nothing proud.
+  - Full-assembly silhouette IoU 0.837 and 0.887, against a user limit of 0.83 because the locked Gate 1 proportions cap it.
+  - Adding Gate 3 edited the recipe entry, which rebuilt every part. The six locked Gate 1-2 parts reproduced their accepted geometry hashes.
+- **Re-verification:** `run --source scene` after the final acceptance reused all 34 checks.
+- **Blender review:** blind survey21 sheets, reference overlays and close-ups for every gate. The old and gated taxis were rendered from identical cameras for the project README.
+- **Toolkit fixes found by the rebuild, each committed with tests:**
+  - per-gate review `iou_min` (8251b2e);
+  - seam pairing on staggered borders (43e85ca) and the gap measured at the visible edge (8d576a9);
+  - panels keep master creases, and geometric corner cuts for panels and openings (9a7a401);
+  - recess `region_mm` (634942f);
+  - the `Pocket guard` shrinkwrap against proud subdivided return vertices (ca31b3a).
+
+  After the last fix, the native surfacing fixture passed again and the host suite passed: 148 tests, 4 skipped.
+
+Not run: the game route (UVs, bake, LODs, Unreal import) for this project; Houdini; and silhouette scores against a photographed reference (the references are generated images). Small details are deferred and listed in the project's `decisions.json`.
+
 ## Gated master-hull workflow (15 October 2026, branch `gated-surfacing`)
 
 - **144 Python tests passed** without native applications (4 opt-in native tests skipped).
