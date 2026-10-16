@@ -1,0 +1,131 @@
+{
+  "version": 1,
+  "id": "20261016T124206Z-af3877b0",
+  "gate": "master",
+  "order": 1,
+  "kind": "geometry",
+  "route": "design",
+  "run": "20261016T123041Z-334b6b5c",
+  "backends": {
+    "blender": {
+      "native_sha256": "f14ad26c37a4d900ec1a4645c42b5b67ec46f1a3018fa0b891b05d48c6d8c61a",
+      "native": ".geometryforge/runs/20261016T123041Z-334b6b5c/design/blender/model.blend",
+      "geometry": {
+        "master_hull": "fb0587735c056154d6377aa493add2effa3a798029c5ac4a6379336c89aecacd",
+        "nacelle_master": "49d7fcd1b38d632f2f8f19d71db11223138f9766e7df87c870b8e5b68f251b42"
+      }
+    }
+  },
+  "checks": {
+    "blender/master_closed": {
+      "kind": "global",
+      "mode": "enforce",
+      "measurements": {
+        "open_edges": 0,
+        "test": "open_edges"
+      },
+      "acceptance": {
+        "met": true,
+        "failures": []
+      },
+      "thresholds": {
+        "silhouette_iou_min": 0.9,
+        "delta_iou_min": 0.0,
+        "open_edges_max": 0,
+        "uncovered_area_mm2_max": 0.0,
+        "cover_tolerance_mm": 3.0
+      },
+      "key": "7ffb80e4a778891e0c38fd3b7ff50724894e5b243100b5eb6d79a26cebcf43df"
+    },
+    "blender/silhouette_primary": {
+      "kind": "global",
+      "mode": "measure",
+      "measurements": {
+        "silhouette_iou": 0.8297814362759012,
+        "delta_iou": -0.01197356627497459,
+        "previous_iou": 0.8417550025508758,
+        "camera": "primary",
+        "camera_rms_px": 10.875571669610412,
+        "raster": [
+          1024,
+          683
+        ],
+        "model_only_px": 15928,
+        "reference_only_px": 29048,
+        "test": "silhouette_iou"
+      },
+      "acceptance": {
+        "met": true,
+        "failures": []
+      },
+      "thresholds": {
+        "silhouette_iou_min": 0.8,
+        "delta_iou_min": 0.0,
+        "open_edges_max": 0,
+        "uncovered_area_mm2_max": 0.0,
+        "cover_tolerance_mm": 3.0
+      },
+      "key": "6b864d6600313d9da8a70eed5717d4b54990595d23933f326cf4979aa785ef6f"
+    },
+    "blender/silhouette_profile": {
+      "kind": "global",
+      "mode": "measure",
+      "measurements": {
+        "silhouette_iou": 0.8168776692742431,
+        "delta_iou": 0.00044449318481831757,
+        "previous_iou": 0.8164331760894248,
+        "camera": "profile",
+        "camera_rms_px": 1.3725357155594746,
+        "raster": [
+          1024,
+          512
+        ],
+        "model_only_px": 4372,
+        "reference_only_px": 34089,
+        "test": "silhouette_iou"
+      },
+      "acceptance": {
+        "met": true,
+        "failures": []
+      },
+      "thresholds": {
+        "silhouette_iou_min": 0.8,
+        "delta_iou_min": 0.0,
+        "open_edges_max": 0,
+        "uncovered_area_mm2_max": 0.0,
+        "cover_tolerance_mm": 3.0
+      },
+      "key": "84ef8fc7d3cb16971b9ed6c7aa894e22e18755ec79b6c1ea1788fce8ffa3a3ea"
+    }
+  },
+  "review": {
+    "review_id": "20261016T123926Z-6fdc017c",
+    "report": "review/20261016T123926Z-6fdc017c/report.json",
+    "report_sha256": "8af572ca0725e974df270598574dfc17ed2d61b2963ec68034b830a773dbd644",
+    "scene_sha256": "f14ad26c37a4d900ec1a4645c42b5b67ec46f1a3018fa0b891b05d48c6d8c61a",
+    "config_sha256": "316e8c9e4d8e9fa8d376d24c649b4ba2cf755cb61d4e7ed9a5781962e252644b",
+    "views": 22,
+    "metrics": {
+      "ref_primary": {
+        "silhouette_iou": 0.829181476651816,
+        "baseline_review": "20261016T062815Z-5dadd9e2",
+        "delta_iou": -0.012090075979984682,
+        "calibrated": true
+      },
+      "ref_profile": {
+        "silhouette_iou": 0.8156181407012586,
+        "baseline_review": "20261016T062815Z-5dadd9e2",
+        "delta_iou": 4.4993806641469014e-05,
+        "calibrated": true
+      }
+    }
+  },
+  "accepted_by": "DavidKahl",
+  "accepted_at": "2026-10-16T12:42:06.887763+00:00",
+  "note": "Gate 1 re-accepted",
+  "toolkit": "1.1.0",
+  "critique": {
+    "path": ".geometryforge/gates/master/20261016T124206Z-af3877b0-critique.md",
+    "sha256": "453b9121674e92247a91a50d514f9b2a5d2906ffa81f2ce5c7bdaed48a76d2bd"
+  }
+}

@@ -1,0 +1,232 @@
+{
+  "brief": "Rain-soaked neon cyberpunk hover taxi, rebuilt top-down through the gated master-hull workflow",
+  "intended_use": "game asset",
+  "units": "mm",
+  "deliverables": "blender",
+  "execution_backend": "blender",
+  "print": {
+    "bed_mm": [
+      220,
+      220,
+      250
+    ],
+    "nozzle_mm": 0.4
+  },
+  "unresolved": [],
+  "output_targets": [
+    "game"
+  ],
+  "game": {
+    "profile": "unreal_desktop_nanite",
+    "role": "hero vehicle, close-up camera",
+    "dimensions_mm": {
+      "body_length": 5800,
+      "overall_length_with_nacelles": 6800,
+      "body_width": 2200,
+      "roof_above_pad_bottom": 1900,
+      "pod_top_above_pad_bottom": 2350
+    },
+    "interior": "simple low-poly interior (seats, dash, wheel) behind tinted see-through glass",
+    "style": "worn cyberpunk taxi: chipped yellow paint, chrome skirt, cyan/amber emissives",
+    "pivot": "centre of body footprint at pad-bottom plane, X forward, Z up",
+    "lighting": "dynamic",
+    "texture_resolution": 4096,
+    "fallback_relative_error": 1.0,
+    "collision": "blocking",
+    "material_regions": [
+      "body (opaque PBR + emissive)",
+      "glass (translucent)"
+    ],
+    "lighting_note": "Dynamic lighting: no lightmap UV channel required",
+    "triangle_budget_plan": {
+      "note": "Planned for the later game route (Nanite <= 250k per output); the design route has no limit.",
+      "outputs": {
+        "body_panels": 200000,
+        "skirt_and_belly": 200000,
+        "nacelles": 160000,
+        "pad": "60000 per instance, one mesh instanced x4",
+        "roof_equipment": 60000,
+        "glass": "conventional (non-Nanite), <= 20000",
+        "interior": "conventional, <= 15000"
+      }
+    }
+  },
+  "reference_review": {
+    "references": [
+      {
+        "path": "references/hover_taxi_front_right_3q.png",
+        "sha256": "73c760956263eafee9a4ca2dd5913ec8340f63dc50d6847e33972f5cda3ffc37",
+        "view": "front-right three-quarter, beltline height; primary identity reference",
+        "original": "Rain-Soaked Neon Hover Taxi.png"
+      },
+      {
+        "path": "references/hover_taxi_rear_left_3q.png",
+        "sha256": "32d31c346f8935a573e81b08b5df345a6d6819ce15351fc8589baad59922cdf2",
+        "view": "rear-left three-quarter, slightly above beltline (generated from primary)"
+      },
+      {
+        "path": "references/hover_taxi_underside_3q.png",
+        "sha256": "33bc9d77258fd321e8bd621d7af61b740bae9f7cccd6a977b66d76d7f6d5783f",
+        "view": "low front-right three-quarter from below (generated)"
+      },
+      {
+        "path": "references/hover_taxi_roof_high_3q.png",
+        "sha256": "7a72eb0f55b04f352e21fdc968558827624aea2b51bfe47f95bd663fc51c2b23",
+        "view": "high front-right three-quarter from above (generated)"
+      },
+      {
+        "path": "references/hover_taxi_right_side_profile.png",
+        "sha256": "7f97f40884c3376022897da1b979092634f95c77e8f59f92d64861b933fbcd09",
+        "view": "right side concept profile, near-orthographic (generated; not a measured projection)"
+      },
+      {
+        "path": "references/generated_views.json",
+        "sha256": "66718b6186dc1cb893fd55e3980b3aca9ae42007d19b043a43a07c40b3f3033c",
+        "view": "prompts and inspection notes for the generated views"
+      }
+    ],
+    "coverage": {
+      "cab_body_right_side": "seen (front 3q, profile, underside, high)",
+      "cab_body_left_side": "seen (rear 3q) + symmetry",
+      "front_fascia": "seen",
+      "rear_face_tail_lights": "seen (rear 3q): two red light bars in chrome rear bumper, central grille, corner mechanical vents",
+      "chrome_lower_skirt": "seen all round",
+      "glazing": "seen; interior partly visible",
+      "roof_sign_and_pod": "seen (high view): sign forward of pod, pod is a low drum on a pedestal with concentric capped top, cyan side ring; antenna behind-left",
+      "rear_nacelles": "seen (rear 3q, high, profile): two angular armored pods on short arms from upper rear body, recessed rectangular cyan-slatted exhausts",
+      "underside_hover_pads": "seen (underside): four corner pads, concentric recessed cyan emitters, radial segmentation, stout vertical bosses and brackets",
+      "chassis_belly": "seen (underside): plated keel, rails, crossmembers, vents",
+      "scale_cues": "door height in profile only; absolute scale is an assumption"
+    },
+    "verdict": "sufficient",
+    "requested_views": [],
+    "assumptions": [
+      "A1 scale: body 5.8 m long excluding nacelles, ~6.8 m overall, ~2.2 m wide, roof ~1.9 m and pod top ~2.35 m above pad bottoms (derived from ~1.15 m door height in profile)",
+      "A2 bilateral symmetry; weathering and decals may differ per side via texture only",
+      "A3 four identical pads ~1.2 m diameter, ~0.25 m deep, under the body corners; follow the underside view's visible stout bosses and brackets, with drop height as a parameter",
+      "A4 pad emitter: recessed concentric rings with radial segmentation and a segmented cyan side band; glow is emissive material, not engine lights",
+      "A5 roof pod: low drum on a pedestal, concentric capped top with central service cap and cyan side ring; sign forward of it, antenna behind-left; static",
+      "A6 nacelles: two octagonal-section armored pods on short horizontal arms from the rear upper body; rear face is a recessed rectangular exhaust with cyan slats (rear view wins), small amber marker lights at lower corners, cyan vertical strip on outer front edge; each a separate named part with pivot at the arm root",
+      "A7 rear: chrome rear bumper with two red light bars, central black grille, corner mechanical vents",
+      "A8 bolts, seams, vents, checker stripe, paint chips and wetness carried by baked normals and textures, not LOD0 geometry",
+      "A9 two material slots: opaque body (incl. emissive) and glass"
+    ],
+    "accepted_by": "user (DavidKahl)",
+    "accepted_at": "2026-10-14",
+    "initial_review": {
+      "coverage": {
+        "cab_body_right_side": "seen",
+        "cab_body_left_side": "inferable (bilateral symmetry)",
+        "front_fascia_headlights_grille": "seen",
+        "chrome_lower_skirt_and_bumper": "seen (front, right side)",
+        "glazing_and_pillars": "seen (right side, windscreen)",
+        "interior": "partly seen through glass (front seats, wheel, dash)",
+        "roof_taxi_sign": "seen (front face only)",
+        "roof_hover_pod": "seen (front/side of drum and cyan ring); top face barely visible; mounting base partly seen",
+        "roof_behind_sign": "guess",
+        "rear_face_and_tail_lights": "guess (not visible)",
+        "rear_nacelles": "front faces and right arm seen; count (2) inferable; exhaust/rear faces and left mount are guesses",
+        "underside_hover_pads": "rims and cyan glow of 3 pads seen; total count/layout (likely 4) inferable; emitter faces, mounting struts and pad depth are guesses",
+        "chassis_underside": "guess (only a ribbed plate edge visible)",
+        "scale_cues": "car-like proportions only; no reliable absolute scale"
+      },
+      "verdict": "insufficient",
+      "requested_views": [
+        "rear three-quarter (left-rear, same lighting): rear face, tail lights, nacelle exhausts and mounting arms, left side",
+        "low three-quarter from below: hover pad emitter faces, pad count and layout, how pads mount to the chassis, chassis underside",
+        "high three-quarter or top view: roof hover pod top face, roof layout behind the sign, nacelle tops",
+        "clean right side profile: proportions, pad spacing, nacelle position and overall length"
+      ],
+      "assumptions": []
+    },
+    "verdict_scope": "Exterior concept coverage is sufficient for a design review. Generated views propose hidden geometry; they are not measured reconstructions or an accepted modeling brief.",
+    "consistency_issues": [
+      "Side image pads sit closer to the chassis than underside-image mounting bosses.",
+      "Generated side image has slight visible upper faces; do not trace it as a calibrated orthographic blueprint.",
+      "Panel seams, nacelle armor proportions and roof equipment placement vary slightly across generated views."
+    ],
+    "reviewed_at": "2026-10-14",
+    "reviewed_by": "Codex",
+    "generation_prompt_record": "references/generated_views.json",
+    "conflicts": [
+      "Pad mount clearance: underside view shows tall visible bosses; profile shows pads tucked close to the chassis",
+      "Nacelle rear face: rear 3q shows cyan exhaust slats; profile shows a stacked amber light block",
+      "Profile is a generated concept, not a true orthographic projection (slight top visibility)"
+    ],
+    "expensive_to_change": [
+      "overall scale and proportions",
+      "part split and pivots (body, glass, roof pod, 4 pads, 2 nacelles)",
+      "conventional vs Nanite profile and triangle budget",
+      "interior or none (drives glass material and UV layout)",
+      "UV/material layout once baking starts"
+    ],
+    "amendments": [
+      {
+        "date": "2026-10-14",
+        "requested_by": "user (\"a more fluid connection between the back engines and the body ... without a concept how the fictional machinery could fit together\")",
+        "supersedes": "A6 mounting: short horizontal arms from the rear upper body, pivot at the arm root",
+        "change": "Nacelle drive train re-read from the three references that show the joint (rear-left 3q, high 3q, side profile): each nacelle front tapers into a dark faceted nose (with a yellow nose armour panel) carrying a bolted coupling hub; a stepped shaft with a bellows seal runs forward along the nacelle axis into a bearing drum on a bolted bulkhead flange at the back of an octagonal socket recessed into the cabin's upper rear corner (stepped reveal frame, painted rear quarter around it); two ribbed service hoses run from the nose face to glands in the socket's inboard wall; a segmented cross-drive spine with a central gearbox under the rear window links both sockets.",
+        "parameters": "nacelle_length 1590 -> 1400 mm (rear exhaust face and overall length unchanged; front now ends ~300 mm behind the cabin as in the profile); nacelle_arm_y_mm and nacelle_arm_root_x_mm replaced by nacelle_socket_x_mm (-2040, socket back wall)",
+        "pivot": "Nacelle pivots (and body sockets Nacelle_L/R) at the shaft entry into the bearing drum: (nacelle_socket_x, +/-nacelle_y, nacelle_z)",
+        "rear_quarter": "Greenhouse band behind the last side window is now painted yellow (as in every reference) instead of dark trim",
+        "check": "assembly: each shaft must run 20-140 mm into its bearing drum and no nacelle geometry may pass the socket back wall"
+      },
+      {
+        "date": "2026-10-16",
+        "requested_by": "user (DavidKahl): fresh gated rebuild in projects/hover_taxi_gated; pads rebuilt from scratch",
+        "change": "Top-down rebuild: calibration -> master hull -> panels -> detail. Old projects stay untouched as evidence."
+      },
+      {
+        "date": "2026-10-16",
+        "requested_by": "user (DavidKahl): \"Reopen Gate 1 (Recommended)\"",
+        "change": "Nacelle sockets move from the side of the rear quarter to the rear face (window band, cap column beside each corner), facing the nacelle hubs as the drive amendment requires. nacelle_y_mm 950 -> 700 so each nacelle axis meets its socket; nacelle outer faces sit flush with the body sides."
+      },
+      {
+        "date": "2026-10-16",
+        "requested_by": "user (DavidKahl): \"Suggestions accepted and adjust the gate requirements to take it as it is for now.\"",
+        "change": "Gate 3 detail accepted as built. Each nacelle shaft is coaxial with its socket (which faces 18 deg up) and meets the forward-facing nacelle hub in a bellows-sealed angle joint, instead of one straight shaft along the nacelle axis. Roof equipment is seated on the roof surface without an interface ring or typed check (the accepted roof panel has no mount opening).",
+        "deferred": [
+          "taller pad bosses (underside view) versus tucked pads (profile)",
+          "belly keel plating, rails, crossmembers and vents",
+          "nacelle amber corner markers and cyan front-edge strips (A6)",
+          "door marker light strips",
+          "front and rear grilles and rear corner vents (A7)"
+        ]
+      }
+    ],
+    "masks": {
+      "references/mask_profile.png": "thresholded from the plain profile background (exact up to the dark-glass edge)",
+      "references/mask_primary.png": "hand-traced 51-point polygon over the city background; an interpretation, about +/-10-15 px"
+    }
+  },
+  "quality_bar": {
+    "established_by": "rules set by the user on 2026-10-14 for hover_taxi; carried over as project-wide rules",
+    "applies_to": "every part of every output; not only parts the user names",
+    "rules": {
+      "bevel_standard": "No raw 90-degree edges. Silhouette edges get a large form bevel scaled to the part (body shell ~60 mm, hull/plates 18-24 mm, small parts 1.5-6 mm), at least 3-7 segments; lathe profiles use filleted corners instead. Form bevels sit before detail cuts; fine bevels after cuts.",
+      "detail_as_geometry": "Panel gaps, vents, grilles, recesses, rivets, bolts and emitter structure are real geometry visible on the Nanite render mesh, not only baked normals. Bake-only detail is limited to micro wear.",
+      "crowned_panels": "Large panels are slightly crowned (5-25 mm sagitta), never perfectly flat.",
+      "inset_glass": "Windows have stepped frames with depth; glass sits set back behind the frame (>= 30 mm from the outer surface).",
+      "plates": "Bumpers and skirts are layered individual metal plates with chamfered edges and visible gaps, worn silver chrome.",
+      "emissives": "Lights sit recessed in dark housings or channels; colours stay saturated (no blown-out white).",
+      "budget": "Nanite profile: <= 250k triangles per output; glass is a conventional output."
+    },
+    "review_per_part": "Render next to the matching reference crop at the same angle, report the triangle count against the budget, and list what is still off before presenting.",
+    "note": "The pads are no longer the accepted exemplar: they are rebuilt in Gate 3 and need a new acceptance."
+  },
+  "threshold_reasons": {
+    "calibration.max_rms_px = 12": "The references are generated concept images, not photographs: hand picks carry 3-6 px error and the generated views differ slightly in panel detail. 12 px is about 1 % of the 1200 px vehicle in the primary (~60 mm on 5.8 m). Primary solved at 10.9 px with 7 datums. Accepted by the user 2026-10-16: \"Gate 0 accepted at 12 px\".",
+    "master silhouette_iou_min = 0.80": "Gate 1 scores the master hull alone, while the masks include pads, roof equipment and keel that Gates 2-3 add; the master alone peaks near 0.82-0.85. Accepted by the user 2026-10-16: \"Gate 1 IoU 0.80, keep profile proportions\". Gate 3 returns to the 0.90 default.",
+    "gate3_silhouette_iou_min_0.83": "Full-assembly silhouette IoU is capped by the locked Gate 1 proportions (0.837 primary, 0.887 profile); accepted 2026-10-16.",
+    "mating_pad_lap_20_80": "Pad boss engages 40 mm past the belly bay seat; accepted 2026-10-16.",
+    "mating_drum_lap_5_40": "Bulkhead flange sits 15 mm behind the socket seat; accepted 2026-10-16.",
+    "mating_coupling_lap_5_40": "Coupling flange sits 10 mm behind the nacelle hub seat; accepted 2026-10-16.",
+    "mating_shaft_lap_20_140": "From the drive amendment of 2026-10-14 (each shaft runs 20-140 mm into its bearing drum)."
+  },
+  "proportion_authority": {
+    "decision": "side profile proportions govern the master",
+    "date": "2026-10-16",
+    "accepted_by": "user (DavidKahl): \"keep profile proportions\"",
+    "evidence": "In the primary the model front projects 80-100 px past the reference; shortening the front ~10% raises primary IoU 0.846 -> 0.868 but drops profile IoU 0.820 -> 0.796. The calibration datums stop at the side lamp, so the front mismatch is attributed mainly to camera extrapolation."
+  }
+}

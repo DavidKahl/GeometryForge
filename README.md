@@ -117,6 +117,15 @@ The agent asks only for decisions that change the design, writes the brief, dime
 
 The printable files (STL, 3MF, the Bambu print kit and the native scenes) are attached to the [GitHub release](https://github.com/DavidKahl/GeometryForge/releases), so you can print it without Blender or Houdini.
 
+## Showcase: gated hover taxi
+
+[`projects/hover_taxi_gated`](projects/hover_taxi_gated) is a 5.8 m cyberpunk hover taxi built top-down through the format 3 gates:
+- a calibrated master hull;
+- panels sliced from it, with recessed pockets;
+- mechanical detail bound to the pockets' interface rings: pads, nacelle drive, glass and roof equipment.
+
+Each gate was accepted after a blind review and measured seam, pocket, mating and silhouette checks. Its [README](projects/hover_taxi_gated/README.md) compares it with two earlier ungated builds from the same cameras: it is ahead on surfacing and attachment, and behind on small detail.
+
 ## How it works
 
 ```text

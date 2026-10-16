@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "views": [
+    {"id": "ref_primary", "camera": {"ref": "primary"}, "modes": ["clay", "zebra", "silhouette", "overlay"], "selection": {"roles": ["guide"]}},
+    {"id": "ref_profile", "camera": {"ref": "profile"}, "modes": ["clay", "zebra", "silhouette", "overlay"], "selection": {"roles": ["guide"]}}
+  ],
+  "presets": [
+    {"preset": "survey21", "bounds_mm": "safe_point", "modes": ["clay", "zebra"], "selection": {"roles": ["guide"]},
+     "resolution": [960, 720], "samples": 8}
+  ]
+}

@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "cameras": {
+    "primary": {
+      "position_mm": [
+        7764.138708367315,
+        -4834.789213774356,
+        1406.7365395771913
+      ],
+      "target_mm": [
+        -76.57007124554093,
+        -6.699746823798705,
+        892.0502368708751
+      ],
+      "up": [
+        -0.0503969148744971,
+        0.024591279279188083,
+        0.9984264719820611
+      ],
+      "projection": "perspective",
+      "lens_mm": 54.81974264026824,
+      "sensor_width_mm": 36.0,
+      "shift_x": 0.0,
+      "shift_y": -0.0,
+      "resolution": [
+        1536,
+        1024
+      ],
+      "role": "primary",
+      "status": "calibrated",
+      "image": "references/hover_taxi_front_right_3q.png",
+      "image_sha256": "73c760956263eafee9a4ca2dd5913ec8340f63dc50d6847e33972f5cda3ffc37",
+      "crop": [
+        0,
+        0,
+        1536,
+        1024
+      ],
+      "rms_px": 10.875571669610412,
+      "max_px": 16.72081969668213,
+      "max_rms_px": 12.0,
+      "condition": 515.2786902629707,
+      "residuals_px": {
+        "marker_rear": 2.4524036471515998,
+        "marker_front": 8.946027896046145,
+        "checker_front_top": 16.72081969668213,
+        "pod_top": 15.09799426012647,
+        "sign_front_top": 13.17758192417337,
+        "rear_bumper_top_r": 6.588629419470939,
+        "rear_bumper_bot_r": 4.160140648733665
+      },
+      "correspondences_sha256": "56f8b17021296252a66caf53338f9d004bc81943cee8a10764396e0b4ed9855f",
+      "solved_at": "20261016T055146Z",
+      "mask": "references/mask_primary.png",
+      "mask_sha256": "672f134e4563708c5b2283d35bf13e1137376f4439408f1952fec4dc7777a734"
+    },
+    "profile": {
+      "position_mm": [
+        363.443680839515,
+        -41470.83569834752,
+        2077.621745640781
+      ],
+      "target_mm": [
+        -490.27542216349997,
+        -833.6702099104732,
+        1096.504629867567
+      ],
+      "up": [
+        0.00039553009158377166,
+        0.02414461441688226,
+        0.9997083980594574
+      ],
+      "projection": "perspective",
+      "lens_mm": 200.0,
+      "sensor_width_mm": 36.0,
+      "shift_x": 0.0,
+      "shift_y": -0.0,
+      "resolution": [
+        1774,
+        887
+      ],
+      "role": "supplementary",
+      "status": "calibrated",
+      "image": "references/hover_taxi_right_side_profile.png",
+      "image_sha256": "7f97f40884c3376022897da1b979092634f95c77e8f59f92d64861b933fbcd09",
+      "crop": [
+        0,
+        0,
+        1774,
+        887
+      ],
+      "rms_px": 1.3725357155594746,
+      "max_px": 2.3492202636917607,
+      "max_rms_px": 12.0,
+      "condition": 1052.0583942844573,
+      "residuals_px": {
+        "marker_rear": 0.6264411747840037,
+        "marker_front": 0.16747091908707132,
+        "checker_front_top": 0.7550357345594358,
+        "pod_top": 1.2478235038724497,
+        "sign_front_top": 2.3492202636917607,
+        "rear_bumper_top_r": 0.883282559881355,
+        "rear_bumper_bot_r": 0.692108987222297,
+        "nacelle_rear_r": 2.219265831489423,
+        "bumper_front_r": 1.644351390048221
+      },
+      "correspondences_sha256": "56f8b17021296252a66caf53338f9d004bc81943cee8a10764396e0b4ed9855f",
+      "solved_at": "20261016T055146Z",
+      "mask": "references/mask_profile.png",
+      "mask_sha256": "00804e336db4b026e2aac84454d5fa99828c7590d947eda529911fdd035e87e3"
+    }
+  }
+}

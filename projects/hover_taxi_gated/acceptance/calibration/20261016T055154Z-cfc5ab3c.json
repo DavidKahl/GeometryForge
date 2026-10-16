@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "id": "20261016T055154Z-cfc5ab3c",
+  "gate": "calibration",
+  "order": 0,
+  "kind": "calibration",
+  "calibration": {
+    "cameras": {
+      "primary": {
+        "rms_px": 10.875571669610412,
+        "max_px": 16.72081969668213,
+        "image": "references/hover_taxi_front_right_3q.png",
+        "image_sha256": "73c760956263eafee9a4ca2dd5913ec8340f63dc50d6847e33972f5cda3ffc37",
+        "mask": "references/mask_primary.png",
+        "mask_sha256": "672f134e4563708c5b2283d35bf13e1137376f4439408f1952fec4dc7777a734",
+        "correspondences_sha256": "56f8b17021296252a66caf53338f9d004bc81943cee8a10764396e0b4ed9855f"
+      }
+    },
+    "cameras_sha256": "c21cf0275f01a058e8e0c79c2d7d78d8fd85f272276059811a1dac84ba4b212f",
+    "max_rms_px": 12.0
+  },
+  "accepted_by": "DavidKahl",
+  "accepted_at": "2026-10-16T05:51:54.006154+00:00",
+  "note": "Gate 0 accepted at 12 px",
+  "toolkit": "1.1.0"
+}

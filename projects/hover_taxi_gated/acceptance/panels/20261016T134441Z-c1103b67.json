@@ -1,0 +1,438 @@
+{
+  "version": 1,
+  "id": "20261016T134441Z-c1103b67",
+  "gate": "panels",
+  "order": 2,
+  "kind": "geometry",
+  "route": "design",
+  "run": "20261016T131828Z-78a7a7fc",
+  "backends": {
+    "blender": {
+      "native_sha256": "5857c456283e3ec9d8c20a7ba2abffb41aed722798d8e6431566d1d81f1650a6",
+      "native": ".geometryforge/runs/20261016T131828Z-78a7a7fc/design/blender/model.blend",
+      "geometry": {
+        "body_panels": "ec6d428df97b79e64d3f317640ecc4f3fc8704102e375e6d3c5c5a751c1e1f9c",
+        "skirt": "9f415107e185094c29b0b4b2a54ff16b815d0522eb6537516c2a49ba08165a6d",
+        "belly": "a66e2cf3548277951b7f7c66cd99f28faf0a8f9bf22d4b3da025172e1990c5ee",
+        "nacelle_armor": "41679d81e667737e20cacdf363c08acc7ce45c81d414128a292f9bfa968da250"
+      }
+    }
+  },
+  "checks": {
+    "blender/seam_doors_r": {
+      "kind": "seam",
+      "mode": "enforce",
+      "measurements": {
+        "exterior_vertices": 3186,
+        "master_deviation_max_mm": 0.00011996164977366414,
+        "seam_pairs": 29,
+        "step_max_mm": 0.00015655326915751548,
+        "gap_min_mm": 2.1721383005032737,
+        "gap_max_mm": 4.111394819501866,
+        "normal_angle_p95_deg": 0.01664491070631067,
+        "normal_angle_max_deg": 0.02557874819558922,
+        "curvature_ratio_p95": 0.010625969682671002,
+        "curvature_ratio_max": 0.021970470338955318
+      },
+      "acceptance": {
+        "met": true,
+        "failures": []
+      },
+      "thresholds": {
+        "master_deviation_mm": 0.25,
+        "step_mm": 0.5,
+        "gap_min_mm": 1.5,
+        "gap_max_mm": 4.5,
+        "normal_angle_deg": 2.5,
+        "curvature_ratio": 0.08,
+        "probe_mm": 15.0,
+        "exterior_band_mm": 1.0,
+        "exterior_normal_deg": 10.0,
+        "min_pairs": 3,
+        "flat_curvature_per_mm": 0.0005
+      },
+      "key": "82dd5e047712193bb28b7cf9028fde18d366c78214aa50429efa7a49c20cb123"
+    },
+    "blender/seam_doors_l": {
+      "kind": "seam",
+      "mode": "enforce",
+      "measurements": {
+        "exterior_vertices": 3186,
+        "master_deviation_max_mm": 0.00012004079624383247,
+        "seam_pairs": 29,
+        "step_max_mm": 0.00018561714026547047,
+        "gap_min_mm": 2.1744221934383883,
+        "gap_max_mm": 4.112536293540459,
+        "normal_angle_p95_deg": 0.01817079005749784,
+        "normal_angle_max_deg": 0.022640812760336106,
+        "curvature_ratio_p95": 0.012313680993662052,
+        "curvature_ratio_max": 0.0237477727349264
+      },
+      "acceptance": {
+        "met": true,
+        "failures": []
+      },
+      "thresholds": {
+        "master_deviation_mm": 0.25,
+        "step_mm": 0.5,
+        "gap_min_mm": 1.5,
+        "gap_max_mm": 4.5,
+        "normal_angle_deg": 2.5,
+        "curvature_ratio": 0.08,
+        "probe_mm": 15.0,
+        "exterior_band_mm": 1.0,
+        "exterior_normal_deg": 10.0,
+        "min_pairs": 3,
+        "flat_curvature_per_mm": 0.0005
+      },
+      "key": "756b0222238330476ed1ea4edb6713644c5379961b7227ba9ee9099031324f57"
+    },
+    "blender/seam_fender_door_r": {
+      "kind": "seam",
+      "mode": "enforce",
+      "measurements": {
+        "exterior_vertices": 6322,
+        "master_deviation_max_mm": 0.00015287231477622843,
+        "seam_pairs": 25,
+        "step_max_mm": 0.009444930908255284,
+        "gap_min_mm": 2.17013000332831,
+        "gap_max_mm": 4.081139465882972,
+        "normal_angle_p95_deg": 0.02987511274537446,
+        "normal_angle_max_deg": 0.2906228384469402,
+        "curvature_ratio_p95": 0.023846629959883615,
+        "curvature_ratio_max": 0.8476019203062741
+      },
+      "acceptance": {
+        "met": true,
+        "failures": []
+      },
+      "thresholds": {
+        "master_deviation_mm": 0.25,
+        "step_mm": 0.5,
+        "gap_min_mm": 1.5,
+        "gap_max_mm": 4.5,
+        "normal_angle_deg": 2.5,
+        "curvature_ratio": 0.08,
+        "probe_mm": 15.0,
+        "exterior_band_mm": 1.0,
+        "exterior_normal_deg": 10.0,
+        "min_pairs": 3,
+        "flat_curvature_per_mm": 0.0005
+      },
+      "key": "e88678d8e1362a2fcea3a57fdeb69c8c65e9de13a9cbd6f75726620bbdd4e8d2"
+    },
+    "blender/seam_door_body_r": {
+      "kind": "seam",
+      "mode": "enforce",
+      "measurements": {
+        "exterior_vertices": 4416,
+        "master_deviation_max_mm": 0.00014494564797252414,
+        "seam_pairs": 29,
+        "step_max_mm": 0.00012195926148369502,
+        "gap_min_mm": 1.7903987968232709,
+        "gap_max_mm": 3.7369404827660895,
+        "normal_angle_p95_deg": 0.02243120349418623,
+        "normal_angle_max_deg": 0.028408546330195395,
+        "curvature_ratio_p95": 0.021781049401217212,
+        "curvature_ratio_max": 0.025729372092177242
+      },
+      "acceptance": {
+        "met": true,
+        "failures": []
+      },
+      "thresholds": {
+        "master_deviation_mm": 0.25,
+        "step_mm": 0.5,
+        "gap_min_mm": 1.5,
+        "gap_max_mm": 4.5,
+        "normal_angle_deg": 2.5,
+        "curvature_ratio": 0.08,
+        "probe_mm": 15.0,
+        "exterior_band_mm": 1.0,
+        "exterior_normal_deg": 10.0,
+        "min_pairs": 3,
+        "flat_curvature_per_mm": 0.0005
+      },
+      "key": "b01b72424df6b21590989df7ceaec440a265e974da4edb15e444924cc144a36e"
+    },
+    "blender/seam_skirt_r23": {
+      "kind": "seam",
+      "mode": "enforce",
+      "measurements": {
+        "exterior_vertices": 3810,
+        "master_deviation_max_mm": 0.00011951007931242955,
+        "seam_pairs": 36,
+        "step_max_mm": 0.002278245947437845,
+        "gap_min_mm": 5.44498150166777,
+        "gap_max_mm": 7.048212270935131,
+        "normal_angle_p95_deg": 1.0856819109097624,
+        "normal_angle_max_deg": 1.5597456551081674,
+        "curvature_ratio_p95": 0.5574565378921137,
+        "curvature_ratio_max": 0.6857887472283999
+      },
+      "acceptance": {
+        "met": true,
+        "failures": []
+      },
+      "thresholds": {
+        "master_deviation_mm": 0.25,
+        "step_mm": 0.5,
+        "gap_min_mm": 3.0,
+        "gap_max_mm": 9.0,
+        "normal_angle_deg": 2.5,
+        "curvature_ratio": 0.6,
+        "probe_mm": 15.0,
+        "exterior_band_mm": 1.0,
+        "exterior_normal_deg": 10.0,
+        "min_pairs": 3,
+        "flat_curvature_per_mm": 0.0005
+      },
+      "key": "683ba2a9868018367c987f1bd3b6abfc7ace205e96bed9905abed28d5642266d"
+    },
+    "blender/recess_windows_r": {
+      "kind": "recess",
+      "mode": "enforce",
+      "measurements": {
+        "protrusion_max_mm": 0.022850987120169794,
+        "proud_vertices": 0,
+        "rim_step_max_mm": 0.00013870707097191962,
+        "pocket_faces": 34592,
+        "pockets": 4,
+        "draft_min_deg": 3.914135511176923,
+        "fillet_min_mm": 0.8958708986229424
+      },
+      "acceptance": {
+        "met": true,
+        "failures": []
+      },
+      "thresholds": {
+        "rim_step_mm": 0.05,
+        "protrusion_mm": 0.05,
+        "draft_min_deg": 3.0,
+        "fillet_min_mm": 0.8,
+        "rim_weight": 0.999,
+        "exterior_normal_deg": 10.0
+      },
+      "key": "6664ad599c966676a034d638db6d1abc6f98c8b18d904a0aed5e61944361ee13"
+    },
+    "blender/recess_rear_panel": {
+      "kind": "recess",
+      "mode": "enforce",
+      "measurements": {
+        "protrusion_max_mm": 0.01127425732148498,
+        "proud_vertices": 0,
+        "rim_step_max_mm": 0.00025168735717220615,
+        "pocket_faces": 6016,
+        "pockets": 2,
+        "draft_min_deg": 4.813038445197997,
+        "fillet_min_mm": 21.591586030715014
+      },
+      "acceptance": {
+        "met": true,
+        "failures": []
+      },
+      "thresholds": {
+        "rim_step_mm": 0.05,
+        "protrusion_mm": 0.05,
+        "draft_min_deg": 3.0,
+        "fillet_min_mm": 5.0,
+        "rim_weight": 0.999,
+        "exterior_normal_deg": 10.0
+      },
+      "key": "a7106e1665e80b0e77dc4492ac487d5c39bacf139b9876b15b59bd4d25b08366"
+    },
+    "blender/recess_roof": {
+      "kind": "recess",
+      "mode": "enforce",
+      "measurements": {
+        "protrusion_max_mm": 0.006224764424733844,
+        "proud_vertices": 0,
+        "rim_step_max_mm": 0.0001890133802427988,
+        "pocket_faces": 16544,
+        "pockets": 1,
+        "draft_min_deg": 3.9295544195895418,
+        "fillet_min_mm": 5.393751989135902
+      },
+      "acceptance": {
+        "met": true,
+        "failures": []
+      },
+      "thresholds": {
+        "rim_step_mm": 0.05,
+        "protrusion_mm": 0.05,
+        "draft_min_deg": 3.0,
+        "fillet_min_mm": 5.0,
+        "rim_weight": 0.999,
+        "exterior_normal_deg": 10.0
+      },
+      "key": "4c870df2b208bdc0dab290382d984d2b5a90721d38b5631b7ec3217682ab2c12"
+    },
+    "blender/recess_nose": {
+      "kind": "recess",
+      "mode": "enforce",
+      "measurements": {
+        "protrusion_max_mm": 0.10397305866599758,
+        "proud_vertices": 0,
+        "rim_step_max_mm": 0.00022474666138451078,
+        "pocket_faces": 18048,
+        "pockets": 2,
+        "draft_min_deg": 4.91084138294177,
+        "fillet_min_mm": 2.3955777962227596
+      },
+      "acceptance": {
+        "met": true,
+        "failures": []
+      },
+      "thresholds": {
+        "rim_step_mm": 0.05,
+        "protrusion_mm": 0.15,
+        "draft_min_deg": 3.0,
+        "fillet_min_mm": 0.8,
+        "rim_weight": 0.999,
+        "exterior_normal_deg": 10.0
+      },
+      "key": "c2391123c3e63c4197ce9696528eb2d3c416b0430745d09b2e74118e73cd373e"
+    },
+    "blender/recess_belly": {
+      "kind": "recess",
+      "mode": "enforce",
+      "measurements": {
+        "protrusion_max_mm": 0.002638569848494691,
+        "proud_vertices": 0,
+        "rim_step_max_mm": 0.00010667066480731752,
+        "pocket_faces": 27072,
+        "pockets": 4,
+        "draft_min_deg": 4.980536373192854,
+        "fillet_min_mm": 19.70090927012059
+      },
+      "acceptance": {
+        "met": true,
+        "failures": []
+      },
+      "thresholds": {
+        "rim_step_mm": 0.05,
+        "protrusion_mm": 0.05,
+        "draft_min_deg": 3.0,
+        "fillet_min_mm": 5.0,
+        "rim_weight": 0.999,
+        "exterior_normal_deg": 10.0
+      },
+      "key": "a3bd7dce07ae12d23414742ca3926a634aa076b7e6260be0c36b4cb2b27d602d"
+    },
+    "blender/recess_bumper_rear": {
+      "kind": "recess",
+      "mode": "enforce",
+      "measurements": {
+        "protrusion_max_mm": 0.004607670766730606,
+        "proud_vertices": 0,
+        "rim_step_max_mm": 0.0002330651989170119,
+        "pocket_faces": 18048,
+        "pockets": 2,
+        "draft_min_deg": 4.905141147336811,
+        "fillet_min_mm": 1.4058837125051975
+      },
+      "acceptance": {
+        "met": true,
+        "failures": []
+      },
+      "thresholds": {
+        "rim_step_mm": 0.05,
+        "protrusion_mm": 0.05,
+        "draft_min_deg": 3.0,
+        "fillet_min_mm": 0.8,
+        "rim_weight": 0.999,
+        "exterior_normal_deg": 10.0
+      },
+      "key": "e3c8df82c35381e5de224f52d9de615ea6a148ec2538c794930e56ba707514b2"
+    },
+    "blender/recess_nacelle_r": {
+      "kind": "recess",
+      "mode": "enforce",
+      "measurements": {
+        "protrusion_max_mm": 0.00038473440306137,
+        "proud_vertices": 0,
+        "rim_step_max_mm": 0.00038473440306137,
+        "pocket_faces": 12032,
+        "pockets": 2,
+        "draft_min_deg": 4.70198062939106,
+        "fillet_min_mm": 12.224041482635462
+      },
+      "acceptance": {
+        "met": true,
+        "failures": []
+      },
+      "thresholds": {
+        "rim_step_mm": 0.05,
+        "protrusion_mm": 0.05,
+        "draft_min_deg": 3.0,
+        "fillet_min_mm": 5.0,
+        "rim_weight": 0.999,
+        "exterior_normal_deg": 10.0
+      },
+      "key": "e19b6b71e1713991c2ec33ac34f18e165b6dea17daa92f20ce664b2e7a52d084"
+    },
+    "blender/coverage_body": {
+      "kind": "global",
+      "mode": "enforce",
+      "measurements": {
+        "samples": 808922,
+        "uncovered_samples": 0,
+        "uncovered_area_mm2": 0.0,
+        "max_gap_mm": 8.841708053220293,
+        "test": "coverage"
+      },
+      "acceptance": {
+        "met": true,
+        "failures": []
+      },
+      "thresholds": {
+        "silhouette_iou_min": 0.9,
+        "delta_iou_min": 0.0,
+        "open_edges_max": 0,
+        "uncovered_area_mm2_max": 0.0,
+        "cover_tolerance_mm": 9.0
+      },
+      "key": "cf12a365c1c8127fc818ee77de4f3e558254e7a40763d26fc1488be073471b0b"
+    },
+    "blender/coverage_nacelles": {
+      "kind": "global",
+      "mode": "enforce",
+      "measurements": {
+        "samples": 125916,
+        "uncovered_samples": 0,
+        "uncovered_area_mm2": 0.0,
+        "max_gap_mm": 7.603033918099446,
+        "test": "coverage"
+      },
+      "acceptance": {
+        "met": true,
+        "failures": []
+      },
+      "thresholds": {
+        "silhouette_iou_min": 0.9,
+        "delta_iou_min": 0.0,
+        "open_edges_max": 0,
+        "uncovered_area_mm2_max": 0.0,
+        "cover_tolerance_mm": 9.0
+      },
+      "key": "f1daa1c14881b3a6a7a8bde4ceef6a2419b3364220cee50c086d1e1c54db247b"
+    }
+  },
+  "review": {
+    "review_id": "20261016T133823Z-ecc5ec9d",
+    "report": "review/20261016T133823Z-ecc5ec9d/report.json",
+    "report_sha256": "d0a1c71d8a33e51572fa30c20c42479d3c4a02cc46db8d00d3b8c9fa07c17337",
+    "scene_sha256": "5857c456283e3ec9d8c20a7ba2abffb41aed722798d8e6431566d1d81f1650a6",
+    "config_sha256": "5a75e15f21c3df301b37f7856ad027fdf7ba61ecdabf2e7915776b2614fe887b",
+    "views": 22,
+    "metrics": {}
+  },
+  "accepted_by": "DavidKahl",
+  "accepted_at": "2026-10-16T13:44:41.384433+00:00",
+  "note": "User approval 2026-10-16: \"Gate 2 re-accepted\" (after the Gate 1 reopen moved the nacelle sockets to the rear face; pocket guard fix ca31b3a)",
+  "toolkit": "1.1.0",
+  "critique": {
+    "path": ".geometryforge/gates/panels/20261016T134441Z-c1103b67-critique.md",
+    "sha256": "e483a9d0fd0b75e3afe0e46d354a1ebf3e29a9746a0c51a80e26d70bafe5a0c2"
+  }
+}

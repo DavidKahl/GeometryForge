@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "views": [
+    {
+      "id": "ref_primary",
+      "camera": {
+        "ref": "primary"
+      },
+      "modes": [
+        "clay",
+        "glossy",
+        "zebra",
+        "overlay"
+      ]
+    },
+    {
+      "id": "ref_profile",
+      "camera": {
+        "ref": "profile"
+      },
+      "modes": [
+        "clay",
+        "glossy",
+        "zebra",
+        "overlay"
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "preset": "survey21",
+      "bounds_mm": "safe_point",
+      "modes": [
+        "clay",
+        "glossy",
+        "zebra"
+      ],
+      "resolution": [
+        960,
+        720
+      ],
+      "samples": 8
+    }
+  ]
+}
