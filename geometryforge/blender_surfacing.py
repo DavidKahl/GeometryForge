@@ -541,6 +541,14 @@ class Surfacing:
         bm.to_mesh(panel.data)
         bm.free()
         panel.data.update()
+        # Subdivision places vertices between the locked rim and the free first ring; their interpolated guide_bound
+        # only partly shrinkwraps them, so where the cage bulges past the master they stay proud. An INSIDE shrinkwrap
+        # on the pocket moves only vertices outside the master back onto it.
+        if 'Pocket guard' not in panel.modifiers:
+            lock = next(i for i, m in enumerate(panel.modifiers) if m.type == 'SHRINKWRAP' and m.target == guide)
+            keep = panel.modifiers.new('Pocket guard', 'SHRINKWRAP')
+            keep.target, keep.wrap_method, keep.wrap_mode, keep.vertex_group = guide, 'NEAREST_SURFACEPOINT', 'INSIDE', 'gf_pocket'
+            panel.modifiers.move(len(panel.modifiers) - 1, lock + 1)
         return {'axis': axis_world.tolist(), 'rim_vertices': len(rim), 'floor_loop': f'{loop_id}_floor', 'floor_closed': floor}
 
     def extract_interface_ring(self, obj, loop_id, name=None, output_id=None):
