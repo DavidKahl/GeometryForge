@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- **Orthographic calibration:** cameras with `"projection": "orthographic"` and a `"view"` (front, back, left, right, top, bottom) are solved by a linear similarity fit of scale, offset and roll from three or more datums. Silhouette scores, overlays and `camera.ref` review views work for every clean view.
+- **Clean reference sets:** reference intake starts with six orthographic, neutrally lit views on a plain background. `geometryforge references masks` writes silhouette masks (alpha or border colour). `references check` cross-checks length, width and height between views and reports disagreement against `gf_thresholds.references.view_disagreement_pct` (default 3%). New skill reference `clean-references.md` with per-view prompt templates and an acceptance checklist.
+
 ## [1.2.0] - 2026-10-16
 
 ### Added

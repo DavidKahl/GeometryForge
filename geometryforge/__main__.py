@@ -57,6 +57,11 @@ def main():
     p.add_argument('project', nargs='?', default='.')
     p.add_argument('--camera', nargs='*', default=None, help='Camera IDs to solve (default: all)')
     p.add_argument('--dry-run', action='store_true', help='Report the solution without writing cameras.json or overlays')
+    p = sub.add_parser('references', help='Silhouette masks and cross-view consistency for a clean orthographic reference set')
+    p.add_argument('action', choices=['masks', 'check'], help='masks: write references/mask_<view>.png; check: compare view extents')
+    p.add_argument('project', nargs='?', default='.')
+    p.add_argument('--threshold', type=float, default=28.0, help='Background colour distance for images without transparency')
+    p.add_argument('--dry-run', action='store_true', help='masks only: report without writing files')
     p = sub.add_parser('gate', help='Inspect, check, accept or reopen modeling gates (format 3)')
     gate_commands = p.add_subparsers(dest='gate_command', required=True)
     for name, text in {'status': 'List gates, the active gate and dormant parts', 'check': 'Report whether a gate is ready to accept (read-only)',
@@ -144,6 +149,9 @@ def main():
         elif args.command == 'calibrate':
             from .camera import calibrate
             result=calibrate(args.project,args.camera,args.dry_run)
+        elif args.command == 'references':
+            from . import references
+            result=references.masks(args.project,args.threshold,args.dry_run) if args.action=='masks' else references.check(args.project,args.threshold)
         elif args.command == 'gate':
             from . import gates
             if args.gate_command == 'status':

@@ -17,6 +17,7 @@ DEFAULTS = {
     'global': {'silhouette_iou_min': 0.90, 'delta_iou_min': 0.0, 'open_edges_max': 0,
                'uncovered_area_mm2_max': 0.0, 'cover_tolerance_mm': 3.0},
     'calibration': {'max_rms_px': 2.0},
+    'references': {'view_disagreement_pct': 3.0},
     'review': {'min_views': 21},
 }
 
