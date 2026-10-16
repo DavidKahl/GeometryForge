@@ -331,7 +331,8 @@ class Surfacing:
         return obj
 
     def slice_panel(self, guide, region, openings=(), name=None, output_id=None, conform=True, **metadata):
-        """Copy one master region's cage faces as a panel; opening borders get gf_loop_<opening> groups.
+        """Copy one master region's cage faces (or the union of a list of regions) as a panel; opening borders get
+        gf_loop_<opening> groups. A union joins regions too thin to stand alone, or a well across several regions.
 
         conform moves the copied cage onto the master's evaluated surface. A subdivision limit surface lies
         inside its control cage, so an unconformed panel cage would leave partly-weighted vertices proud.
@@ -340,9 +341,12 @@ class Surfacing:
         import bmesh
         bpy = _bpy()
         ids = json.loads(guide['gf_regions'])
-        for key in (region, *openings):
+        members = [region] if isinstance(region, str) else list(region)
+        for key in (*members, *openings):
             if key not in ids:
                 raise ValueError(f'Unknown master region: {key}')
+        chosen = {ids[key] for key in members}
+        label = '+'.join(members)
         bm = bmesh.new()
         bm.from_mesh(guide.data)
         layer = bm.faces.layers.int.get('gf_region')
@@ -350,21 +354,21 @@ class Surfacing:
         loops = {}
         for opening in openings:
             border = {v.index for f in bm.faces if f[layer] == ids[opening] for v in f.verts}
-            border &= {v.index for f in bm.faces if f[layer] == ids[region] for v in f.verts}
+            border &= {v.index for f in bm.faces if f[layer] in chosen for v in f.verts}
             if not border:
-                raise ValueError(f'Opening {opening} does not touch region {region}')
+                raise ValueError(f'Opening {opening} does not touch region {label}')
             # Positions identify the loop across later topology edits.
             loops[opening] = [tuple(bm.verts[i].co) for i in sorted(border)]
-        bmesh.ops.delete(bm, geom=[f for f in bm.faces if f[layer] != ids[region]], context='FACES')
+        bmesh.ops.delete(bm, geom=[f for f in bm.faces if f[layer] not in chosen], context='FACES')
         bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
-        mesh = bpy.data.meshes.new(name or f'{guide.name} {region}')
+        mesh = bpy.data.meshes.new(name or f'{guide.name} {label}')
         bm.to_mesh(mesh)
         bm.free()
         mesh.attributes.remove(mesh.attributes['gf_region'])
         # The master's edge creases stay on the copied cage: the panel then subdivides to the master's own limit
         # surface, and shrinkwrap only corrects small offsets instead of chasing sharp styling edges it rounded off.
         mesh.shade_smooth()
-        obj = bpy.data.objects.new(name or f'{guide.name} {region}', mesh)  # checks select objects by this name
+        obj = bpy.data.objects.new(name or f'{guide.name} {label}', mesh)  # checks select objects by this name
         bpy.context.scene.collection.objects.link(obj)
         obj.matrix_world = guide.matrix_world.copy()
         if conform:
@@ -377,7 +381,7 @@ class Surfacing:
             mesh.update()
             after = np.array([v.co for v in mesh.vertices], dtype=float)
             loops = {key: [tuple(after[int(np.linalg.norm(before - p, axis=1).argmin())]) for p in points] for key, points in loops.items()}
-        self.api.register_output(obj, output_id, 'design', **{'kind': 'panel', **metadata, 'region': region, 'openings': list(openings)})
+        self.api.register_output(obj, output_id, 'design', **{'kind': 'panel', **metadata, 'region': label, 'openings': list(openings)})
         obj['gf_loops'] = json.dumps(loops)
         self._refresh_groups(obj)
         return obj
@@ -401,7 +405,7 @@ class Surfacing:
         if not interior:
             bm.free()
             raise ValueError(f'{obj.name} has no faces inside its border strip; call inset_panel_perimeter first')
-        bmesh.ops.delete(bm, geom=interior, context='FACES_ONLY')
+        bmesh.ops.delete(bm, geom=interior, context='FACES')  # also drops edges between interior faces
         bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
         inner = [tuple(v.co) for v in {v for e in bm.edges if e.is_boundary for v in e.verts} - rim]
         bm.to_mesh(obj.data)

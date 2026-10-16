@@ -11,13 +11,13 @@ def cage(length, width, height):
     bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=3, use_grid_fill=True)
     bm.verts.index_update()
     bm.faces.index_update()
-    regions = {'body': [], 'skirt': [], 'lamp': [], 'vent': []}
+    regions = {'body': [], 'skirt': [], 'lamp': [], 'vent_upper': [], 'vent_lower': []}
     for face in bm.faces:
         x, y, z = face.calc_center_median()
         if x > .49 and abs(y) < .2 and .25 < z < .45:  # fully surrounded by body faces
             regions['lamp'].append(face.index)
-        elif x < -.49 and abs(y) < .2 and abs(z) < .25:  # straddles the body/skirt seam at z = 0
-            regions['vent'].append(face.index)
+        elif x < -.49 and 0 < y < .2 and abs(z) < .25:  # one face wide, straddling the body/skirt seam at z = 0
+            regions['vent_upper' if z > 0 else 'vent_lower'].append(face.index)
         else:
             regions['body' if z > 0 else 'skirt'].append(face.index)
     verts = [(v.co.x * length, v.co.y * width, v.co.z * height) for v in bm.verts]
@@ -55,7 +55,8 @@ def build_parts(parameters, parts, api):
         elif part == 'skirt':
             panel(api, bpy.data.objects['Master hull'], 'skirt', 'Skirt panel', parameters)
         elif part == 'vent':
-            vent = panel(api, bpy.data.objects['Master hull'], 'vent', 'Vent well', parameters, well=True, feature='vent')
+            # One well over two master regions (the union of a list), so it spans the seam between them.
+            vent = panel(api, bpy.data.objects['Master hull'], ['vent_upper', 'vent_lower'], 'Vent well', parameters, well=True, feature='vent')
             s.recessed_pocket_extrude(vent, 'vent', parameters['vent_depth_mm'], 6.0, 10.0, floor=True)
             s.extract_interface_ring(vent, 'vent', name='_interface_vent')
         elif part == 'lens':
