@@ -77,12 +77,38 @@ def create_app():
         root=project(key)
         return [read(file) for file in sorted((root/'.geometryforge/imports').glob('*/import.json'),reverse=True)]
 
+    @app.get('/api/projects/{key}/references')
+    def references(key: str):
+        """Clean orthographic views (with their calibrated cameras) and other reference images of a project."""
+        root=project(key)
+        cameras=read(root/'references/cameras.json',{}).get('cameras',{})
+        by_image={entry.get('image'):(ident,entry) for ident,entry in cameras.items()}
+        clean=read(root/'references/clean_set.json',{}).get('views',{})
+        result,seen=[],set()
+        for view,path in clean.items():
+            ident,entry=by_image.get(path,(None,None))
+            result.append({'path':path,'view':view,'kind':'clean','camera':ident,'calibration':entry})
+            seen.add(path)
+        for ident,entry in cameras.items():
+            if entry.get('image') not in seen:
+                result.append({'path':entry['image'],'view':entry.get('view') or ident,'kind':'calibrated','camera':ident,'calibration':entry})
+                seen.add(entry['image'])
+        decisions=read(root/'decisions.json',{})
+        for item in decisions.get('reference_review',{}).get('references',[]) if isinstance(decisions,dict) else []:
+            path=item.get('path') if isinstance(item,dict) else None
+            if path and path not in seen and Path(path).suffix.lower() in ('.png','.jpg','.jpeg') and (root/path).is_file():
+                result.append({'path':path,'view':item.get('view',''),'kind':'identity','camera':None,'calibration':None})
+                seen.add(path)
+        return result
+
     @app.get('/api/projects/{key}/artifact')
     def download(key: str, path: str, inline: bool = False):
         root=project(key)
         target=inside(root,path)
-        # Only retained run artifacts can be served, never arbitrary source files.
-        if not any(target.is_relative_to((root/'.geometryforge'/folder).resolve()) for folder in ('runs','imports')) or not target.is_file():
+        # Only retained run artifacts and reference images can be served, never arbitrary source files.
+        evidence=any(target.is_relative_to((root/'.geometryforge'/folder).resolve()) for folder in ('runs','imports'))
+        reference=target.is_relative_to((root/'references').resolve()) and target.suffix.lower() in ('.png','.jpg','.jpeg')
+        if not (evidence or reference) or not target.is_file():
             raise HTTPException(404,'Artifact not found')
         if target.suffix.lower() not in ('.json','.png','.jpg','.jpeg','.stl','.3mf','.blend','.hip','.hipnc','.hiplc','.log','.fbx','.glb','.zip','.csv'):
             raise HTTPException(404,'Unsupported artifact type')

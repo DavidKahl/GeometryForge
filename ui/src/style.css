@@ -225,3 +225,12 @@ dialog.lightbox[open]{display:flex}
   main{padding:14px 16px}:root{--viewport-h:380px}.hint{display:none}.crumbs{border:0;padding:0}
   .pane-label{max-width:calc(50% - 14px);font-size:11px}
 }
+
+/* References: clean orthographic views laid over the model along their calibrated cameras. */
+#ref-overlay{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;z-index:1;mix-blend-mode:normal}
+.ref-tools{display:flex;gap:12px;align-items:center}
+.ref-tools input{vertical-align:middle}
+.ref-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;padding:0 12px 12px}
+.ref-card{display:flex;flex-direction:column;align-items:stretch;padding:6px;gap:6px;text-align:left}
+.ref-card img{width:100%;aspect-ratio:1;object-fit:contain;background:#0b121b;border-radius:4px}
+.ref-label{display:flex;flex-direction:column;font-size:12px}

@@ -122,3 +122,26 @@ test('guide masters stay hidden until requested and routes report their own stat
   await page.locator('#guides').uncheck();await expect(page.locator('#viewport')).toHaveAttribute('data-meshes','1');
   expect(errors).toEqual([]);
 });
+
+test('references gallery snaps along a calibrated view and orbiting releases it',async({page})=>{
+  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('/');await project(page,'Fixture Surface').click();
+  await expect(leaves(page)).toHaveCount(1,{timeout:30000});
+  await page.locator('#tab-refs').click();
+  const cards=page.locator('#refs .ref-card');
+  await expect(cards).toHaveCount(3);
+  await expect(page.locator('#refs-count')).toHaveText('3');
+  await cards.filter({hasText:'right'}).click();
+  await expect(page.locator('#ref-overlay')).toBeVisible();
+  await expect(page.locator('#viewport')).toHaveAttribute('data-snap','right');
+  await page.locator('#ref-opacity').fill('0.8');
+  await expect(page.locator('#ref-overlay')).toHaveCSS('opacity','0.8');
+  const box=(await page.locator('#viewport canvas').boundingBox())!;
+  await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();
+  await page.mouse.move(box.x+box.width/2+80,box.y+box.height/2+20,{steps:5});await page.mouse.up();
+  await expect(page.locator('#ref-overlay')).toBeHidden();
+  await expect(page.locator('#viewport')).not.toHaveAttribute('data-snap','right');
+  await cards.filter({hasText:'identity'}).click();
+  await expect(page.locator('#lightbox')).toBeVisible();
+  expect(errors).toEqual([]);
+});

@@ -58,6 +58,21 @@ export class Viewer{
     this.controls.target.copy(center);this.camera.position.copy(center).add(new THREE.Vector3(1,-1.15,.75).normalize().multiplyScalar(distance));
     this.camera.near=distance/1000;this.camera.far=distance*100;this.camera.updateProjectionMatrix();this.controls.update();
   }
+  // Near-orthographic view along a calibrated reference camera: far away with a matching narrow lens.
+  snap(position:THREE.Vector3,target:THREE.Vector3,up:THREE.Vector3,fovDeg:number){
+    const distance=position.distanceTo(target);
+    this.camera.up.copy(up);this.camera.fov=fovDeg;this.camera.position.copy(position);this.controls.target.copy(target);
+    this.camera.near=distance/50;this.camera.far=distance*3;this.camera.updateProjectionMatrix();this.controls.update();
+  }
+  // Back to the normal lens and Z-up orbit, keeping the current framing.
+  unsnap(){
+    if(this.camera.fov===40&&this.camera.up.z===1)return;
+    const target=this.controls.target,distance=this.camera.position.distanceTo(target);
+    const scale=Math.tan(THREE.MathUtils.degToRad(this.camera.fov)/2)/Math.tan(THREE.MathUtils.degToRad(20));
+    const direction=this.camera.position.clone().sub(target).normalize();
+    this.camera.fov=40;this.camera.up.set(0,0,1);this.camera.position.copy(target).add(direction.multiplyScalar(distance*scale));
+    this.camera.near=distance*scale/1000;this.camera.far=distance*scale*100;this.camera.updateProjectionMatrix();this.controls.update();
+  }
   saveCamera(){return {position:this.camera.position.clone(),target:this.controls.target.clone(),near:this.camera.near,far:this.camera.far}}
   restoreCamera(s:ReturnType<Viewer['saveCamera']>){this.camera.position.copy(s.position);this.controls.target.copy(s.target);this.camera.near=s.near;this.camera.far=s.far;this.camera.updateProjectionMatrix();this.controls.update()}
   // Returns the part under the pointer in whichever pane it is over.

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import './style.css';
-import {api,artifactURL,clearCache,el,fileName,find,loadParts,natural,runTime,session,shortId,startSession,type Context,type Filament,type Kit,type Loaded,type Project,type Run} from './api';
+import {api,artifactURL,clearCache,el,fileName,find,loadParts,natural,runTime,session,shortId,startSession,type Context,type Filament,type Kit,type Loaded,type Project,type Reference,type Run} from './api';
 import {addGround,makePane,Viewer,type Pane} from './scene';
 import {baseName,renderParts,type Diff,type PartsState,type Row} from './parts';
 import {renderRuns} from './runs';
@@ -22,13 +22,13 @@ document.querySelector('#app')!.innerHTML=`
 <select id="backend" aria-label="Backend"><option>blender</option><option>houdini</option></select><button id="fit" class="small" title="Fit view (F)">Fit</button></div>
 <div id="diff" class="diff" hidden></div>
 <div id="route-toolbar" class="toolbar" hidden><label>Representation <select id="target" aria-label="Representation"></select></label><label>Compare representation <select id="compare-target" aria-label="Compare representation"></select></label><label><input id="normalize" type="checkbox"> Normalize comparison size</label><label><input id="guides" type="checkbox"> Guides</label><span id="game-tools"><label><input id="wireframe" type="checkbox"> Wireframe</label><label><input id="collision" type="checkbox"> Collision</label><label><input id="pivots" type="checkbox"> Pivots / sockets</label><label>LOD <select id="lod" aria-label="LOD"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label></span></div>
-<div id="viewport"><div id="overlays"></div><div class="empty" id="empty">Your geometry will appear here.<br><small>Select a run to explore its parts.</small></div><div id="progress" hidden></div><div id="hover" hidden></div><span id="dimensions"></span></div>
+<div id="viewport"><img id="ref-overlay" alt="" hidden><div id="overlays"></div><div class="empty" id="empty">Your geometry will appear here.<br><small>Select a run to explore its parts.</small></div><div id="progress" hidden></div><div id="hover" hidden></div><span id="dimensions"></span></div>
 <div class="hint">Click a part to select · Ctrl/Shift-click to add · double-click or <kbd>I</kbd> to isolate · <kbd>H</kbd> hide · <kbd>Alt</kbd>+<kbd>H</kbd> show all · <kbd>F</kbd> fit · <kbd>Esc</kbd> back</div>
 </section>
 <section class="side">
-<div class="tabs" role="tablist"><button id="tab-parts" role="tab" class="active" aria-selected="true">Parts <span id="parts-count" class="count"></span></button><button id="tab-runs" role="tab" aria-selected="false">Runs <span id="runs-count" class="count"></span></button></div>
+<div class="tabs" role="tablist"><button id="tab-parts" role="tab" class="active" aria-selected="true">Parts <span id="parts-count" class="count"></span></button><button id="tab-runs" role="tab" aria-selected="false">Runs <span id="runs-count" class="count"></span></button><button id="tab-refs" role="tab" aria-selected="false">References <span id="refs-count" class="count"></span></button></div>
 <div id="panel-parts" class="panel"><div class="parts-tools"><input id="part-filter" type="search" placeholder="Filter parts…" aria-label="Filter parts"><div class="segmented small-seg"><button id="show-all" title="Show all parts">All</button><button id="show-none" title="Hide all parts">None</button><button id="show-invert" title="Invert visibility">Invert</button></div></div><div id="selection-bar" class="selection-bar"></div><div id="parts"></div></div>
-<div id="panel-runs" class="panel" hidden><p class="muted pad">Click a run to open it as <b>A</b>. <b>Compare</b> puts another run beside it as <b>B</b>.</p><div id="runs"></div></div>
+<div id="panel-refs" class="panel" hidden><p class="muted pad">Click a calibrated view to look along its camera with the reference laid over the model. Orbiting returns to the normal view.</p><div class="ref-tools pad"><label>Overlay <input id="ref-opacity" type="range" min="0" max="1" step="0.05" value="0.5" aria-label="Overlay opacity"></label><button id="ref-hide" class="ghost">Hide overlay</button></div><div id="refs" class="ref-grid"></div></div><div id="panel-runs" class="panel" hidden><p class="muted pad">Click a run to open it as <b>A</b>. <b>Compare</b> puts another run beside it as <b>B</b>.</p><div id="runs"></div></div>
 </section></div>
 <section id="details" class="card details" hidden></section>
 <section class="card renders-card"><h2>Renders <span id="renders-note" class="muted"></span></h2><div id="renders" class="renders"></div></section>
@@ -40,6 +40,7 @@ const $=(id:string)=>document.getElementById(id)!;
 const viewer=new Viewer($('viewport'));
 let projects:Record<string,Project>={},runs:Run[]=[],ctx:Context|undefined,revision=0;
 let importEvidence:ImportEvidence[]=[];
+let references:Reference[]=[];
 let runA:Run|undefined,runB:Run|undefined,loadedA=new Map<string,Loaded>(),loadedB:Map<string,Loaded>|undefined;
 let colourMode:'part'|'filament'='part',pose:'assembly'|'print'='assembly',mode:'split'|'overlay'='split',hovered:string|undefined,assemblyCamera:ReturnType<Viewer['saveCamera']>|undefined;
 const state:PartsState={selection:new Set(),hidden:new Set(),filter:'',collapsed:new Set(),isolated:null};
@@ -313,8 +314,35 @@ document.addEventListener('keydown',e=>{
 });
 
 // ---------- Toolbar & panels wiring ----------
-function showTab(tab:'parts'|'runs'){for(const t of ['parts','runs']){$('tab-'+t).classList.toggle('active',t===tab);$('tab-'+t).setAttribute('aria-selected',String(t===tab));$('panel-'+t).hidden=t!==tab}}
-$('tab-parts').onclick=()=>showTab('parts');$('tab-runs').onclick=()=>showTab('runs');
+function showTab(tab:'parts'|'runs'|'refs'){for(const t of ['parts','runs','refs']){$('tab-'+t).classList.toggle('active',t===tab);$('tab-'+t).setAttribute('aria-selected',String(t===tab));$('panel-'+t).hidden=t!==tab}}
+$('tab-parts').onclick=()=>showTab('parts');$('tab-runs').onclick=()=>showTab('runs');$('tab-refs').onclick=()=>showTab('refs');
+
+// ---------- references ----------
+const overlay=$('ref-overlay') as HTMLImageElement;
+function hideOverlay(){overlay.hidden=true;delete $('viewport').dataset.snap;viewer.unsnap()}
+function snapTo(ref:Reference){
+  const c=ref.calibration;if(!c||!c.ortho_scale_mm){openLightbox([{path:ref.path,title:ref.view,subtitle:ref.kind,kind:'image'}]);return}
+  const position=new THREE.Vector3(...c.position_mm),target=new THREE.Vector3(...c.target_mm),up=new THREE.Vector3(...c.up);
+  const direction=target.clone().sub(position).normalize(),box=viewer.contentBox();
+  const centre=box.isEmpty()?target:box.getCenter(new THREE.Vector3());
+  const onAxis=position.clone().add(direction.clone().multiplyScalar(centre.clone().sub(position).dot(direction)));
+  const distance=300000,rect=$('viewport').getBoundingClientRect(),[width,height]=c.resolution;
+  const shown=Math.min(rect.width,rect.height*width/height),perPixel=c.ortho_scale_mm/shown;
+  viewer.snap(onAxis.clone().sub(direction.multiplyScalar(distance)),onAxis,up,THREE.MathUtils.radToDeg(2*Math.atan(rect.height*perPixel/2/distance)));
+  overlay.src=artifactURL(ref.path,true);overlay.style.opacity=($('ref-opacity') as HTMLInputElement).value;overlay.hidden=false;
+  $('viewport').dataset.snap=ref.view;
+}
+function renderReferences(){
+  $('refs-count').textContent=references.length?String(references.length):'';
+  $('refs').replaceChildren(...references.map(ref=>{
+    const card=el('button',{class:'ref-card',title:ref.calibration?`Look along the ${ref.view} camera with the reference overlaid`:'Open the reference'},
+      el('img',{src:artifactURL(ref.path,true),alt:ref.view,loading:'lazy'}),
+      el('span',{class:'ref-label'},el('b',{textContent:ref.view}),el('span',{class:'muted',textContent:ref.calibration?`${ref.kind} · ${ref.calibration.rms_px?.toFixed(1)??'?'} px`:ref.kind})));
+    card.onclick=()=>snapTo(ref);return card}));
+}
+($('ref-opacity') as HTMLInputElement).oninput=e=>{overlay.style.opacity=(e.target as HTMLInputElement).value};
+$('ref-hide').onclick=()=>hideOverlay();
+viewer.controls.addEventListener('start',()=>{if(!overlay.hidden)hideOverlay()});
 $('part-filter').oninput=()=>{state.filter=($('part-filter') as HTMLInputElement).value;renderPartsPanel()};
 $('show-all').onclick=()=>setHidden([...loadedA.keys()],false);$('show-none').onclick=()=>setHidden([...loadedA.keys()],true);
 $('show-invert').onclick=()=>{const all=[...loadedA.keys()];const shown=all.filter(n=>!state.hidden.has(n));state.hidden=new Set(shown);applyState();updateDimensions();renderPartsPanel()};
@@ -337,7 +365,7 @@ async function openProject(id:string){
   await refreshProjects();await refresh();const start=runs.find(r=>r.id===ctx?.safe_point)??runs[0];if(start)await openRun(start);else $('empty').hidden=false;
 }
 async function refresh(){
-  if(!session.key)return;const requested=session.key;const result=await Promise.all([api(`/projects/${requested}/context`),api(`/projects/${requested}/runs`),api(`/projects/${requested}/imports`)]);if(session.key!==requested)return;[ctx,runs,importEvidence]=result;
+  if(!session.key)return;const requested=session.key;const result=await Promise.all([api(`/projects/${requested}/context`),api(`/projects/${requested}/runs`),api(`/projects/${requested}/imports`),api(`/projects/${requested}/references`)]);if(session.key!==requested)return;[ctx,runs,importEvidence,references]=result;renderReferences();
   const stale=Object.values(ctx!.backends).some(s=>s.stale||s.working_changed);
   // Format 2+ projects report each route on its own: a finished design route stays current while a later game route is unbuilt.
   const routes=Object.entries(ctx!.targets??{});

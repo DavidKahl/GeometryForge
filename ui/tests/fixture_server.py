@@ -146,6 +146,18 @@ def seed():
     with (surface/'project.toml').open('a') as stream:
         stream.write('\n[targets.design]\n')
     result=engine.execute(surface,target='design');assert result['targets']['design']['status']=='passed',result['failures']
+    # References: two clean views (the right one calibrated) and one identity image.
+    from geometryforge.camera import solve_orthographic
+    (surface/'references/clean').mkdir(parents=True)
+    for view in ('right','top'):
+        Image.new('RGB',(400,400),'#d8dde3').save(surface/f'references/clean/{view}.png')
+    Image.new('RGB',(320,200),'#c08030').save(surface/'references/concept.png')
+    write(surface/'references/clean_set.json',{'version':1,'views':{'right':'references/clean/right.png','top':'references/clean/top.png'}})
+    world=[[30,-20,0],[-30,-20,0],[0,-20,20],[30,-20,20]]
+    solved=solve_orthographic(world,[[200+x*4,300-z*4] for x,_,z in world],[400,400],'right')
+    write(surface/'references/cameras.json',{'version':1,'cameras':{'right':{**solved['camera'].review(),'resolution':[400,400],'role':'primary',
+        'status':'calibrated','image':'references/clean/right.png','crop':[0,0,400,400],'rms_px':solved['rms_px'],'view':'right'}}})
+    d=read(surface/'decisions.json');d['reference_review']={'references':[{'path':'references/concept.png','view':'identity concept'}]};write(surface/'decisions.json',d)
     projects.register(surface,'Fixture Surface')
 
 
