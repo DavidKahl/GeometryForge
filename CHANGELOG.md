@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-16
+
 ### Added
 
 - **Per-gate review IoU:** `[gates.<id>.review] iou_min` scores a gate's review below the project default, for early gates whose reference masks include parts that later gates add.
@@ -38,6 +40,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Panels keep the master's creases:** `slice_panel` no longer drops the master's edge creases, so panels subdivide to the master's limit surface and shrinkwrap only corrects small offsets (nacelle coverage misses fell from 1.37 m2 to 0.28 m2).
 - **Seam gap at the visible edge:** the skin border sits where the normal limit is crossed along the edge that runs most nearly across the border, independent of how coarse or skewed the subdivided strip is. Step and curvature still compare the flush skin vertices.
 - **Pocket returns never stand proud:** `recessed_pocket_extrude` adds a `Pocket guard` Shrinkwrap (INSIDE mode, `gf_pocket` group) after the master lock. Subdivision creates vertices between the locked rim and the free first ring with partial `guide_bound`; where the cage bulges past the master they stayed up to 0.64 mm proud on the hover taxi's rear sockets. The guard moves only vertices outside the master back onto it.
+- **Viewer hides guide surfaces:** master hulls and interface rings no longer draw over the panels that cover them (the hover taxi showed its smooth master instead of windows and seams). A **Guides** toggle shows them on request.
+- **Viewer reports each route:** the banner lists every output route with its own state, for example `design: current · print: not built`, instead of marking a finished design route out of date while a later route is unbuilt.
 - **Seam gap on staggered borders:** seam checks pair each border vertex with the nearest point on the other panel's border edges and measure the gap to that point. Coarse or differently subdivided borders no longer drop out of pairing or count their along-seam offset as gap. Border vertices whose gap vector runs along their own border (panel corners) are excluded.
 
 - Recipes now receive parts dependencies-first. Alphabetical order could build a dependent part against geometry that its dependency's rebuild then deleted.
@@ -46,8 +50,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - `geometryforge review`: disposable Blender rendering of saved scenes with repeatable cameras, part/object selection, clay/glossy/silhouette/wireframe images, reference contact sheets and hashed provenance. Review does not run builders, save scene edits or change safe points; failed reviews retain evidence.
 - Reference-driven surface-modeling guidance covering compound curvature, subdivision cages, surface-derived panels, swept trim, real geometric detail, staged visual review and detail-preserving optimization.
 - Dedicated native review fixture and input/provenance/failure regression tests.
-- Isolated hover-taxi geometry study with front body, one pad and one rear engine; original taxi construction and runs preserved.
-- Full-taxi advanced study reusing accepted native pads, with protected engine facets, a seated exhaust collar and mechanical receiving housings. Surface-modeling guidance now covers feature-edge protection, shared mating sections and visible structural load paths.
+- Surface-modeling guidance covers feature-edge protection, shared mating sections and visible structural load paths, learned from two ungated hover-taxi studies (kept locally, not in the repository).
+- **Showcase: `projects/hover_taxi_gated`.** A hover taxi built through all four gates in Blender, with its acceptance records, blind critiques and a same-camera comparison against the ungated studies.
 
 ## [1.1.0] - 2026-10-14
 

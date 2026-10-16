@@ -1,6 +1,6 @@
 [project]
 name = "geometryforge"
-version = "1.1.0"
+version = "1.2.0"
 description = "Agent-led editable Blender/Houdini game assets and printable models with independent validation and Unreal delivery"
 readme = "README.md"
 license = "MIT"
