@@ -110,3 +110,69 @@ def test_calibrate_dry_run_writes_nothing(project):
     camera.calibrate(root, dry_run=True)
     assert not (root / 'references/cameras.json').exists()
     assert not (root / 'review').exists()
+
+
+# Screen axes of each clean view, written out independently of camera.ORTHO_VIEWS:
+# pixel = offset + scale * Rot(roll) @ (a, b), with b pointing down the image.
+ORTHO_AXES = {'front': lambda p: (p[:, 1], -p[:, 2]), 'back': lambda p: (-p[:, 1], -p[:, 2]),
+              'left': lambda p: (-p[:, 0], -p[:, 2]), 'right': lambda p: (p[:, 0], -p[:, 2]),
+              'top': lambda p: (-p[:, 1], -p[:, 0]), 'bottom': lambda p: (p[:, 1], -p[:, 0])}
+
+
+def ortho_pixels(view, points, scale=0.17, roll_deg=1.5, offset=(612.0, 655.0)):
+    a, b = ORTHO_AXES[view](np.asarray(points, dtype=float))
+    c, s = np.cos(np.radians(roll_deg)), np.sin(np.radians(roll_deg))
+    return np.column_stack((offset[0] + scale * (c * a - s * b), offset[1] + scale * (s * a + c * b)))
+
+
+@pytest.mark.parametrize('view', sorted(ORTHO_AXES))
+def test_orthographic_views_recover_scale_roll_and_offset(view):
+    points = cloud(8, 5)
+    pixels = ortho_pixels(view, points)
+    result = camera.solve_orthographic(points, pixels, [1254, 1254], view)
+    solved = result['camera']
+    assert result['rms_px'] < 1e-6 and result['roll_deg'] == pytest.approx(1.5, abs=1e-6)
+    assert solved.projection == 'orthographic' and solved.ortho_scale_mm == pytest.approx(1254 / 0.17, rel=1e-9)
+    np.testing.assert_allclose(solved.project(points)[0], pixels, atol=1e-6)
+    assert (solved.project(points)[1] > 0).all()
+
+
+def test_orthographic_view_conventions():
+    nose, tail, left, right, high = [3000, 0, 800], [-3000, 0, 800], [0, 1100, 800], [0, -1100, 800], [0, 0, 2000]
+    def uv(view, point):
+        solved = camera.solve_orthographic(cloud(6, 2), ortho_pixels(view, cloud(6, 2), roll_deg=0), [1254, 1254], view)['camera']
+        return solved.project([point])[0][0]
+    assert uv('right', nose)[0] > uv('right', tail)[0] and uv('left', nose)[0] < uv('left', tail)[0]
+    assert uv('front', left)[0] > uv('front', right)[0] and uv('back', left)[0] < uv('back', right)[0]
+    assert uv('top', nose)[1] < uv('top', tail)[1] and uv('top', right)[0] > uv('top', left)[0]
+    assert uv('bottom', nose)[1] < uv('bottom', tail)[1] and uv('bottom', left)[0] > uv('bottom', right)[0]
+    assert uv('right', high)[1] < uv('right', nose)[1] and uv('front', high)[1] < uv('front', left)[1]
+
+
+def test_orthographic_noise_and_degenerate_inputs():
+    points = cloud(10, 7)
+    noisy = ortho_pixels('right', points) + np.random.default_rng(8).normal(0, 1.0, (10, 2))
+    result = camera.solve_orthographic(points, noisy, [1254, 1254], 'right')
+    assert 0.3 < result['rms_px'] < 2.0 and result['max_px'] >= result['rms_px']
+    with pytest.raises(ValueError, match='at least 3'):
+        camera.solve_orthographic(points[:2], noisy[:2], [1254, 1254], 'right')
+    with pytest.raises(ValueError, match='view'):
+        camera.solve_orthographic(points, noisy, [1254, 1254], 'diagonal')
+    with pytest.raises(ValueError, match='coincide'):
+        camera.solve_orthographic([[0, 0, 0], [500, 0, 0], [900, 0, 0]], [[1, 1], [2, 2], [3, 3]], [1254, 1254], 'front')
+
+
+def test_calibrate_orthographic_camera(project):
+    root, _ = project
+    (root / 'references').mkdir()
+    Image.new('RGB', (1254, 1254), 'white').save(root / 'references/right.png')
+    world = [[2900, -1000, 300], [-2900, -1000, 300], [0, -1100, 1950], [1500, -1000, 0], [-1800, -1000, 0]]
+    pixels = ortho_pixels('right', world)
+    write(root / 'references/correspondences.json', {'version': 1, 'cameras': {'right': {
+        'role': 'primary', 'image': 'references/right.png', 'projection': 'orthographic', 'view': 'right',
+        'points': [{'id': f'p{i}', 'world_mm': w, 'pixel': list(map(float, xy))} for i, (w, xy) in enumerate(zip(world, pixels))]}}})
+    result = camera.calibrate(root)
+    entry = read(root / 'references/cameras.json')['cameras']['right']
+    assert result['status'] == 'passed' and entry['status'] == 'calibrated'
+    assert entry['projection'] == 'orthographic' and entry['view'] == 'right' and entry['rms_px'] < 1e-6
+    np.testing.assert_allclose(camera.Camera.from_dict(entry).project(world)[0], pixels, atol=1e-6)

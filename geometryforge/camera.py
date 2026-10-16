@@ -225,6 +225,50 @@ def solve(points_3d, points_2d, image_size, lens_mm=None, sensor_width_mm=36.0, 
             'max_px': float(errors.max()), 'condition': condition}
 
 
+# Clean orthographic reference views in vehicle space (X forward, Y left, Z up): view direction and screen up.
+ORTHO_VIEWS = {'front': ((-1, 0, 0), (0, 0, 1)), 'back': ((1, 0, 0), (0, 0, 1)),
+               'left': ((0, -1, 0), (0, 0, 1)), 'right': ((0, 1, 0), (0, 0, 1)),
+               'top': ((0, 0, -1), (1, 0, 0)), 'bottom': ((0, 0, 1), (1, 0, 0))}
+
+
+def solve_orthographic(points_3d, points_2d, image_size, view):
+    """Orthographic camera for a fixed view direction: a linear similarity fit of scale, offset and roll."""
+    if view not in ORTHO_VIEWS:
+        raise ValueError(f'Orthographic view must be one of {sorted(ORTHO_VIEWS)}')
+    points = np.asarray(points_3d, dtype=float)
+    pixels = np.asarray(points_2d, dtype=float)
+    width, height = image_size
+    if points.ndim != 2 or points.shape[1] != 3 or pixels.shape != (len(points), 2):
+        raise ValueError('Calibration needs matching 3D world_mm and 2D pixel points')
+    if not (np.isfinite(points).all() and np.isfinite(pixels).all()):
+        raise ValueError('Calibration points must be finite')
+    direction, up = (np.asarray(v, dtype=float) for v in ORTHO_VIEWS[view])
+    right = np.cross(direction, up)
+    vertical = np.cross(right, direction)
+    a, b = points @ right, -(points @ vertical)
+    if len(points) < 3:
+        raise ValueError('Orthographic calibration needs at least 3 correspondences (2 fit exactly and give no error estimate)')
+    if np.ptp(np.column_stack((a, b)), axis=0).max() <= 1e-6:
+        raise ValueError('Calibration datums coincide in this view; add points spread across the image')
+    # u = u0 + p*a - q*b,  v = v0 + q*a + p*b  with p = s cos(roll), q = s sin(roll)
+    ones, zeros = np.ones_like(a), np.zeros_like(a)
+    design = np.vstack((np.column_stack((a, -b, ones, zeros)), np.column_stack((b, a, zeros, ones))))
+    target = np.concatenate((pixels[:, 0], pixels[:, 1]))
+    (p, q, u0, v0), *_ = np.linalg.lstsq(design, target, rcond=None)
+    scale, roll = math.hypot(p, q), math.atan2(q, p)
+    if scale <= 0:
+        raise ValueError('Orthographic calibration did not find a positive scale')
+    errors = np.linalg.norm((design @ np.array([p, q, u0, v0]) - target).reshape(2, -1).T, axis=1)
+    rolled_right = math.cos(roll) * right + math.sin(roll) * vertical
+    rolled_up = -math.sin(roll) * right + math.cos(roll) * vertical
+    depth = float((points @ direction).min()) - 20000.0  # camera well in front of every datum
+    position = rolled_right * ((width / 2 - u0) / scale) + rolled_up * ((v0 - height / 2) / scale) + direction * depth
+    camera = Camera(position_mm=position.tolist(), target_mm=(position + direction * 20000.0).tolist(), up=rolled_up.tolist(),
+                    resolution=[int(width), int(height)], projection='orthographic', ortho_scale_mm=width / scale)
+    return {'camera': camera, 'residuals_px': errors.tolist(), 'rms_px': float(math.sqrt((errors ** 2).mean())),
+            'max_px': float(errors.max()), 'condition': float(np.linalg.cond(design)), 'roll_deg': math.degrees(roll)}
+
+
 def resolve_point(value, parameters, label):
     if isinstance(value, dict) and set(value) == {'param'}:
         if value['param'] not in parameters:
@@ -331,7 +375,12 @@ def calibrate(root, cameras=None, dry_run=False):
                 raise ValueError(f'{ident}.{q["id"]}: pixel needs [x, y]')
             pixel.append([value[0] - crop[0], value[1] - crop[1]])
         size = [crop[2] - crop[0], crop[3] - crop[1]]
-        result = solve(world, pixel, size, priors.get('lens_mm'), priors.get('sensor_width_mm', 36.0), priors.get('principal', 'center'))
+        if spec.get('projection', 'perspective') == 'orthographic':
+            result = solve_orthographic(world, pixel, size, spec.get('view'))
+        elif spec.get('projection', 'perspective') == 'perspective':
+            result = solve(world, pixel, size, priors.get('lens_mm'), priors.get('sensor_width_mm', 36.0), priors.get('principal', 'center'))
+        else:
+            raise ValueError(f'{ident}: projection must be perspective or orthographic')
         role = spec.get('role', 'supplementary')
         accepted = result['rms_px'] <= limit
         state = 'calibrated' if accepted else ('rejected' if role == 'primary' else 'inconsistent')
@@ -343,6 +392,8 @@ def calibrate(root, cameras=None, dry_run=False):
                  'max_rms_px': limit, 'condition': result['condition'],
                  'residuals_px': {q['id']: e for q, e in zip(picks, result['residuals_px'])},
                  'correspondences_sha256': digest(source), 'solved_at': stamp}
+        if camera.projection == 'orthographic':
+            entry.update(view=spec['view'], roll_deg=result['roll_deg'])
         if spec.get('mask'):
             mask = projects.inside(root, spec['mask'])
             if not mask.is_file():
