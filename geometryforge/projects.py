@@ -10,11 +10,50 @@ ROOT = Path(__file__).resolve().parent.parent
 PACKAGE = Path(__file__).resolve().parent
 ID = re.compile(r"^[a-z][a-z0-9_]*$")
 
+CHECK_KINDS = ("seam", "recess", "mating", "global")
+SURFACE_CHECKS = PACKAGE / "surface_checks.py"
+
+def checker(root, check):
+    """Typed checks run the packaged surface checker; others run a project file."""
+    return SURFACE_CHECKS if check.get("kind") else inside(root, check["source"])
+
+def validate_check(root, name, check, parts, version, params):
+    if not ID.fullmatch(name) or not isinstance(check.get("parts"), list) or set(check["parts"]) - parts.keys():
+        raise ValueError(f"Invalid check {name}")
+    if "kind" in check:
+        if version < 2 or "source" in check:
+            raise ValueError(f"Typed check {name} needs format 2+ and replaces source with kind")
+        if check["kind"] not in CHECK_KINDS:
+            raise ValueError(f"Unknown check kind for {name}: {check['kind']}")
+        if not isinstance(check.get("spec", {}), dict) or not isinstance(check.get("thresholds", {}), dict):
+            raise ValueError(f"Check {name}: spec and thresholds must be tables")
+        default = "measure" if check.get("spec", {}).get("test") == "silhouette_iou" else "enforce"
+        check.setdefault("mode", default)
+        if check["mode"] not in ("enforce", "measure"):
+            raise ValueError(f"Check {name}: mode must be enforce or measure")
+        # Threshold layers and calibration evidence are inputs of the result.
+        if "gf_thresholds" in params and "gf_thresholds" not in check.setdefault("parameters", []):
+            check["parameters"].append("gf_thresholds")
+        if check.get("spec", {}).get("test") == "silhouette_iou":
+            sources = check.setdefault("sources", [])
+            cameras = root / "references/cameras.json"
+            if cameras.is_file():
+                for extra in ["references/cameras.json", read(cameras).get("cameras", {}).get(check["spec"].get("camera"), {}).get("mask")]:
+                    if extra and extra not in sources:
+                        sources.append(extra)
+    elif not inside(root, check.get("source", "")).is_file():
+        raise ValueError(f"Missing checker {name}")
+    for path in check.get("sources", []):
+        if not inside(root, path).is_file():
+            raise ValueError(f"Missing checker source {path}")
+
 def load(root):
     root = Path(root).resolve()
     config = tomllib.loads((root / "project.toml").read_text(encoding="utf-8"))
-    if config.get("format_version") not in (1, 2):
+    if config.get("format_version") not in (1, 2, 3):
         raise ValueError("Unsupported GeometryForge project format")
+    if config.get("gates") and config["format_version"] < 3:
+        raise ValueError("Gates require format_version = 3; run geometryforge migrate --format 3")
     if not ID.fullmatch(config["project"]["id"]):
         raise ValueError("Invalid project ID")
     parts = config.get("parts", {})
@@ -26,24 +65,21 @@ def load(root):
         for path in spec.get("sources", []):
             if not inside(root, path).is_file():
                 raise ValueError(f"Missing source {path}")
+    params = read(root / "parameters.json", {})
+    fingerprint(params)  # rejects nonfinite JSON values
     for name, check in config.get("checks", {}).items():
-        if not ID.fullmatch(name) or set(check["parts"]) - parts.keys():
-            raise ValueError(f"Invalid check {name}")
-        if not inside(root, check["source"]).is_file():
-            raise ValueError(f"Missing checker {name}")
+        validate_check(root, name, check, parts, config["format_version"], params)
     for backend, spec in config.get("backends", {}).items():
         if backend not in ("blender", "houdini") or not inside(root, spec["entry"]).is_file():
             raise ValueError(f"Invalid backend {backend}")
     state = read(root / ".geometryforge/state.json", {"format_version": config['format_version'], "backends": {}, "targets": {}, "safe_points": {}, "latest_attempt": None, "safe_point": None, "issues": []})
-    if state.get("format_version") not in (1, 2):
+    if state.get("format_version") not in (1, 2, 3):
         raise ValueError("Unsupported state version")
     decisions = read(root / "decisions.json", {})
-    params = read(root / "parameters.json", {})
-    fingerprint(params)  # rejects nonfinite JSON values
     if decisions.get('units', 'mm') != 'mm':
         raise ValueError('GeometryForge project units must be mm')
     p = {"root": root, "config": config, "state": state, "decisions": decisions, "parameters": params}
-    if config['format_version'] == 2:
+    if config['format_version'] >= 2:
         from .targets import validate_contract
         validate_contract(p)
     if config['format_version'] == 1 or 'print' in decisions.get('output_targets', []):
@@ -61,11 +97,12 @@ def inputs(project):
     for spec in project["config"].get("parts", {}).values():
         names.update(spec.get("sources", []))
     for spec in project["config"].get("checks", {}).values():
-        names.add(spec["source"])
+        if "source" in spec:
+            names.add(spec["source"])
         names.update(spec.get("sources", []))
     for spec in project["config"].get("backends", {}).values():
         names.add(spec["entry"])
-    if project['config']['format_version'] == 2:
+    if project['config']['format_version'] >= 2:
         from .targets import declared_files
         names.update(declared_files(project))
     return {name: digest(inside(root, name)) for name in sorted(names)}
@@ -77,6 +114,21 @@ def closure(config, changed):
         if expanded == result:
             return result
         result = expanded
+
+def build_order(config, parts):
+    """Dependencies before dependents, alphabetical among independent parts.
+
+    Recipes may reference objects another part created; building a dependent first would bind
+    it to geometry that the dependency's rebuild then deletes.
+    """
+    remaining, ordered = set(parts), []
+    while remaining:
+        ready = sorted(p for p in remaining if not set(config["parts"][p].get("depends", [])) & remaining)
+        if not ready:
+            raise ValueError(f"Cyclic part dependencies: {sorted(remaining)}")
+        ordered.append(ready[0])
+        remaining.discard(ready[0])
+    return ordered
 
 def part_inputs(project, name):
     spec = project["config"]["parts"][name]

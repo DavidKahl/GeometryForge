@@ -2,6 +2,54 @@
 
 What has actually been verified, on what, and when. Nothing here claims a physical print. Native validation has only been done on Windows.
 
+## Gated master-hull workflow (15 October 2026, branch `gated-surfacing`)
+
+- **144 Python tests passed** without native applications (4 opt-in native tests skipped).
+  - New coverage: camera solving (synthetic pose/focal/shift recovery, coplanar datums with a lens prior, noise, degenerate inputs), calibration files and overlays.
+  - Mesh queries against brute force.
+  - Every typed check class on synthetic geometry with pass and fail cases: flush/stepped/tilted seams, a tangent-continuous curvature break, proud contents, a straight-walled pocket, misaligned and over-lapped rings, skin crossings, open edges, uncovered master area with and without a declared opening, and silhouette IoU and delta.
+  - Gate frontier, refusals, locks, acceptance evidence, reopen/supersede and dependent-route holds.
+  - Format 3 migration and contract errors, review presets, calibrated refs, IoU baselines, blind output and region diffs.
+- **Blender 5.2.1 LTS native review tests passed:** zebra, normal, part_id, section cuts and overlays rendered, and two identical reviews were pixel-identical in part_id and normal.
+- **Native three-gate fixture passed in Blender 5.2.1 LTS** (`tools/fixtures/surfacing_project`, `GEOMETRYFORGE_RUN_NATIVE_SURFACING=1`):
+  - **Master gate:** built only the closed master hull (0 open edges), then six zebra/silhouette review views, `gate check` and acceptance. The locked master was then refused for `--parts`.
+  - **Panels gate:** seam deviation 0.0001 mm, step 0.0001 mm, gap 3.63 mm, tangent break 0.013° and curvature ratio 0.044 (p95). Coverage found no uncovered area with the lamp opening excused by its interface ring.
+  - **Detail gate:** no proud vertices, rim step 0.0001 mm, draft 5.8°, return fillet 2.71 mm, lens lap 5.0 mm on axis, 0 skin crossings.
+  - **Re-verification** of the saved scene reproduced every geometry hash and reused every check.
+  - **Per-check fixture thresholds,** each recorded with its reason in `project.toml`: coverage tolerance 6 mm for the cube cage's valence-3 corner poles, and fillet 2.5 mm for the square plan corners of a two-face opening.
+- **Houdini 22.0.368 native evidence test passed:** a guide sphere and two interface circles built as SOPs were extracted with their roles. The typed `open_edges` and `mating` checks passed (lap 48 mm), and moving the plug to 60 mm failed the run as intended. The `api.surf` helpers are Blender-only; Houdini surfacing parity is **not** claimed.
+- **Evidence-hash compatibility:** the bundled `mechanical_prop` design route was built with the previous toolkit (commit 62c2817) and re-verified with this one. The geometry hash was identical and no parts were reported changed. The format 1 and 2 showcase projects load with unchanged context.
+- **Fixture development surfaced engine and helper defects that are now fixed:**
+  - parts are passed to recipes dependencies-first;
+  - panel cages conform to the master;
+  - Solidify uses simple offset (even offset exploded at pocket returns);
+  - pocket rings are mitred and weighted 0 inside the flush rim;
+  - check meshes ignore oversized triangles when bounding searches.
+
+Not run: the viewer browser tests (the viewer was not changed), game packaging or Unreal import of a gated project, and any reference-calibrated silhouette on a real photograph. The thresholds are starting defaults from an unverified engineering report, not validated acceptance limits.
+
+## Advanced taxi and attachment review (15 October 2026)
+
+- **75 Python tests passed** with `GEOMETRYFORGE_RUN_NATIVE_REVIEW=1` and Blender configured. The dedicated managed fixture tested render-level subdivision, collection/Geometry Nodes instances, review errors, source hashes and unchanged fixture safe points. No tests used the user's working taxi as a fixture.
+- **7 Chromium tests passed** on the dedicated port-8744 fixtures after `npm ci --prefix ui` and `npm run build --prefix ui`. The rebuilt viewer bundle is retained and byte-identical to the tracked bundle.
+- **Blender 5.2.1 LTS** built the isolated full-exterior [advanced taxi study](../projects/hover_taxi_advanced_study/README.md), including explicit engine facet boundaries, shared exhaust seating sections, receiving housings and structural support. Saved-scene review includes all four modes and front/rear/side/roof/underside, isolated pad/engine and mounted interface views. Matched pilot/advanced comparisons retain identical cameras, resolution and studio placement.
+- **61 project-specific native geometry checks passed.** Actual evaluated-mesh intersections checked collar/frame, grille carriers, shaft/races, housing/fairing/body, glands/hoses, webs/beams/rails, sills/floor, vents, rear lamps and pad saddles. All four accepted pads retain 216 native objects and 45,268 triangles each, with identical evaluated topology and modifier stacks; the largest placement-normalized vertex difference is 0.000137 mm.
+- **Presentation-only delivery passed evaluated geometry equality after reopening**, with zero local vertex difference from the retained managed scene. Source/config/reference/artifact hashes, the interface report and delivery-equivalence report connect the native copy to its evidence. Original and pilot scene/working/state hashes are preserved.
+- **Canonical guidance refreshed** into both repository harness installations, covering protected feature edges, shared mating sections, mechanical housing/load paths and reuse of accepted native components.
+
+This is a first full-exterior study with visual refinements listed in its README. Technical geometry checks do not establish reference acceptance or engineering performance. No new game package, Unreal import, Houdini optimization, slicer review or physical print test ran for this continuation.
+
+## Geometry review and taxi study checks (14 October 2026)
+
+- **75 Python tests passed** with `GEOMETRYFORGE_RUN_NATIVE_REVIEW=1` and the local Blender executable configured. This includes input validation, hashed source/config/reference/artifact provenance, retained runtime failures, cancellation, missing/changed inputs and review execution that preserves the source and project state. Without the opt-in flag the dedicated native test skips.
+- **Blender 5.2.1 LTS**, on Windows, created and reopened a dedicated temporary managed subdivision-panel fixture. Clay, glossy, silhouette and wireframe renders were nonblank, respected the requested resolution and evaluated the saved render modifier levels. Construction operands were excluded; unknown/non-renderable selections failed. Native collection and Geometry Nodes instances rendered with evaluated transforms. Source scene hashes and the fixture safe-point record stayed unchanged. Fixed studio placement was checked.
+- **7 Chromium tests passed** on the self-contained port-8744 fixtures after `npm ci --prefix ui` and the viewer production build. The rebuilt `geometryforge/web_dist` is byte-identical to the tracked bundle, so there is no bundle change to commit.
+- **Wheel and source distribution built.** The wheel contains both review modules, the new canonical surface-modeling reference and the prebuilt viewer. The canonical skill was refreshed into both repository harness installations.
+- **Isolated hover taxi study** built and reopened editable compound-curved front surfaces, one segmented front-right pad and one right rear engine. Review evidence includes all four modes, isolated/mounted views and before/after comparisons with identical cameras, resolutions and explicit studio light placement. Original taxi design/game snapshots and project-state SHA-256 values remained unchanged. See the local [study delivery](../projects/hover_taxi_geometry_study/README.md) and its `delivery.json` for geometry counts, hashes, retained reports and remaining visual mismatches.
+- **Original-detail audit** ray-sampled four +Y door/fender seams at three heights in copied retained design/game scenes. Door groove centers survived; their edge sidewalls became sloped over roughly 1 mm. The largest ray-hit difference at a groove edge was about 46.44 mm, not a measured vertex displacement or proof of complete groove removal. The audit does not cover the whole asset.
+
+The study remains a candidate with visual acceptance pending. No new game package, Unreal import, Houdini optimization, slicer review or physical print test was performed for this change. The images demonstrate geometry and review tooling, not an exact reconstruction of the photographic or generated references.
+
 ## Environment
 
 Windows, Python 3.12.13, Blender 5.2.1 LTS, Houdini 22.0.368 Apprentice (saves `.hipnc` through its supported GUI/OBJ workflow), Bambu Studio 2.8.2.

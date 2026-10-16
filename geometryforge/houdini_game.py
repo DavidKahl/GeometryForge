@@ -3,10 +3,53 @@ import json
 from pathlib import Path
 
 
+SURFACE_ATTRIBUTES = ('guide_bound', 'gf_inner', 'gf_solidify_rim', 'gf_pocket')
+
+
+def point_attributes(geometry):
+    """Surfacing weights and gf_* float point attributes; empty for geometry built without them."""
+    import hou
+    result = {}
+    for attribute in geometry.pointAttribs():
+        name = attribute.name()
+        if attribute.dataType() != hou.attribData.Float or not (name in SURFACE_ATTRIBUTES or name.startswith('gf_')):
+            continue
+        values = geometry.pointFloatAttribValues(name)
+        size = attribute.size()
+        result[name] = [round(v, 6) for v in values] if size == 1 else [list(values[i:i + size]) for i in range(0, len(values), size)]
+    return result
+
+
+def interface(node, output):
+    """Edge-only mating ring evidence from polylines or closed polygons, without triangulation."""
+    import hou
+    import numpy as np
+    geometry = output.geometry()
+    if geometry is None:
+        raise ValueError(f'{node.path()}: cannot evaluate interface ring')
+    edges = []
+    for primitive in geometry.prims():
+        points = [v.point().number() for v in primitive.vertices()]
+        edges += [[a, b] for a, b in zip(points, points[1:])]
+        if primitive.type() == hou.primType.Polygon and primitive.isClosed() and len(points) > 2:
+            edges.append([points[-1], points[0]])
+    if not edges:
+        raise ValueError(f'Interface ring has no edges: {node.path()}')
+    matrix = np.asarray(node.worldTransform().asTuple()).reshape(4, 4).T
+    item = {'evidence_version': 2, 'name': node.name(), 'node': node.path(), 'part': node.userData('gf_part') or node.name(),
+            'role': 'interface', 'vertices': [list(p.position()) for p in geometry.points()], 'faces': [], 'edges': edges,
+            'matrix_world': matrix.tolist(), 'pivot_mm': matrix[:3, 3].tolist(),
+            'metadata': json.loads(node.userData('gf_metadata') or '{}')}
+    attributes = point_attributes(geometry)
+    if attributes:
+        item['point_attributes'] = attributes
+    return item
+
+
 def extract(target='game'):
     import hou
     import numpy as np
-    roles = {'render','lod','collision'} if target == 'game' else {'design','high_detail'}
+    roles = {'render','lod','collision'} if target == 'game' else {'design','high_detail','guide','interface'}
     root = hou.node('/obj/geometryforge')
     result = []
     for node in root.children():
@@ -16,6 +59,9 @@ def extract(target='game'):
         output = node.node('OUT')
         if output is None:
             raise ValueError(f'{node.path()}: registered output requires OUT')
+        if role == 'interface':
+            result.append(interface(node, output))
+            continue
         triangulate = node.createNode('divide','gf_evidence_triangles')
         triangulate.setInput(0,output)
         try:
@@ -59,11 +105,15 @@ def extract(target='game'):
                     tangents.append(row)
             metadata = json.loads(node.userData('gf_metadata') or '{}')
             matrix = np.asarray(node.worldTransform().asTuple()).reshape(4,4).T
-            result.append({'evidence_version':2,'name':node.name(),'node':node.path(),'part':node.userData('gf_part') or node.name(),
-                           'role':role,'vertices':vertices,'faces':faces,'uv_layers':uvs,'corner_normals':normals,
-                           'corner_tangents':tangents,'corner_colors':colors,'face_materials':assignments,
-                           'materials':json.loads(node.userData('gf_materials') or '[]'),'matrix_world':matrix.tolist(),
-                           'pivot_mm':matrix[:3,3].tolist(),'metadata':metadata})
+            item = {'evidence_version':2,'name':node.name(),'node':node.path(),'part':node.userData('gf_part') or node.name(),
+                    'role':role,'vertices':vertices,'faces':faces,'uv_layers':uvs,'corner_normals':normals,
+                    'corner_tangents':tangents,'corner_colors':colors,'face_materials':assignments,
+                    'materials':json.loads(node.userData('gf_materials') or '[]'),'matrix_world':matrix.tolist(),
+                    'pivot_mm':matrix[:3,3].tolist(),'metadata':metadata}
+            attributes = point_attributes(geometry)
+            if attributes:
+                item['point_attributes'] = attributes
+            result.append(item)
         finally:
             triangulate.destroy()
     if not result: raise ValueError(f'No registered {target} SOP outputs')

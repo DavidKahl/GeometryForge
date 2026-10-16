@@ -138,13 +138,35 @@ def material_evidence(mat):
     return result
 
 
+SURFACE_GROUPS = ('guide_bound', 'gf_inner', 'gf_solidify_rim', 'gf_pocket')
+
+
+def point_attributes(original, mesh):
+    """Surfacing weights and gf_* point attributes; empty for meshes built without them."""
+    result = {}
+    names = {group.index: group.name for group in original.vertex_groups
+             if group.name in SURFACE_GROUPS or group.name.startswith('gf_loop_')}
+    if names:
+        values = {name: [0.0] * len(mesh.vertices) for name in names.values()}
+        for vertex in mesh.vertices:
+            for element in vertex.groups:
+                if element.group in names:
+                    values[names[element.group]][vertex.index] = round(element.weight, 6)
+        result.update(values)
+    for attribute in mesh.attributes:
+        if attribute.domain == 'POINT' and attribute.name.startswith('gf_') and attribute.data_type in ('FLOAT', 'FLOAT_VECTOR'):
+            field = 'value' if attribute.data_type == 'FLOAT' else 'vector'
+            result[attribute.name] = [getattr(item, field) if field == 'value' else list(getattr(item, field)) for item in attribute.data]
+    return result
+
+
 def meshes(target='game'):
     import bpy
     if bpy.context.scene.get('geometryforge_units') != 'mm':
         raise ValueError('Game source scene must use GeometryForge millimeters')
     bpy.context.view_layer.update()
     graph = bpy.context.evaluated_depsgraph_get()
-    roles = {'render', 'lod', 'collision'} if target == 'game' else {'design', 'high_detail'}
+    roles = {'render', 'lod', 'collision'} if target == 'game' else {'design', 'high_detail', 'guide', 'interface'}
     result = []
     for original in bpy.context.scene.objects:
         role = original.get('gf_role')
@@ -153,6 +175,19 @@ def meshes(target='game'):
         evaluated = original.evaluated_get(graph)
         mesh = evaluated.to_mesh(preserve_all_data_layers=True, depsgraph=graph)
         try:
+            attributes = point_attributes(original, mesh)
+            if role == 'interface':
+                item = {'evidence_version': 2, 'name': original.name, 'part': original.get('gf_part', original.name),
+                        'role': role, 'vertices': [list(v.co) for v in mesh.vertices], 'faces': [],
+                        'edges': [list(e.vertices) for e in mesh.edges],
+                        'matrix_world': [list(row) for row in original.matrix_world], 'pivot_mm': list(original.location),
+                        'metadata': json.loads(original.get('gf_metadata', '{}'))}
+                if not item['edges']:
+                    raise ValueError(f'Interface ring has no edges: {original.name}')
+                if attributes:
+                    item['point_attributes'] = attributes
+                result.append(item)
+                continue
             mesh.calc_loop_triangles()
             triangles = list(mesh.loop_triangles)
             if not triangles:
@@ -178,6 +213,8 @@ def meshes(target='game'):
                     'materials': [material_evidence(mesh.materials[slot]) for slot in slots] if role in ('render', 'lod') else [],
                     'matrix_world': [list(row) for row in original.matrix_world], 'pivot_mm': list(original.location),
                     'metadata': metadata}
+            if attributes:
+                item['point_attributes'] = attributes
             result.append(item)
         finally:
             evaluated.to_mesh_clear()

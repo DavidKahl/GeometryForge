@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "presets": [
+    {
+      "preset": "standard6",
+      "bounds_mm": [[-620, -320, -220], [620, 320, 220]],
+      "modes": ["zebra", "silhouette"],
+      "selection": {"roles": ["guide"]},
+      "resolution": [240, 180],
+      "samples": 4
+    }
+  ]
+}

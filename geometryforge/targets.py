@@ -53,6 +53,8 @@ def validate_contract(p):
     config = p['config'].get('targets', {})
     if set(config) - set(ROUTES):
         raise ValueError('Unknown target configuration')
+    from . import gates
+    gates.validate(p)
     for name, spec in config.items():
         if set(spec.get('depends', [])) - set(ROUTES) or name in spec.get('depends', []):
             raise ValueError(f'Invalid target dependency: {name}')
@@ -119,12 +121,21 @@ def route_view(p, target, profile=None):
     config['checks'] = {n: deepcopy(c) for n, c in p['config'].get('checks', {}).items()
                         if target in c.get('targets', ['print', 'game']) and ('checks' not in spec or n in spec['checks'])}
     config.pop('targets', None)
+    gate_state = None
+    if config.pop('gates', None):
+        from . import gates
+        gate_state = gates.frontier(p)
+        if target == gate_state['route']:
+            # Later-gate parts are dormant: never built, checked or required in the scene.
+            keep = set(gate_state['frontier'])
+            config['parts'] = {n: s for n, s in config['parts'].items() if n in keep}
+            config['checks'] = {n: c for n, c in config['checks'].items() if set(c['parts']) <= keep}
     state = p['state'].get('targets', {}).get(target, {'backends': {}, 'safe_point': None})
     decision = deepcopy(p['decisions'])
     decision[target] = settings(p, target, profile)
     return {**p, 'config': config, 'decisions': decision,
             'state': {**state, 'issues': [], 'latest_attempt': p['state'].get('latest_attempt')},
-            '_target': target, '_settings': decision[target], '_target_spec': spec}
+            '_target': target, '_settings': decision[target], '_target_spec': spec, '_gates': gate_state}
 
 
 def route_key(p, target, profile=None):
@@ -136,7 +147,7 @@ def route_key(p, target, profile=None):
     for spec in config['backends'].values():
         names.add(spec['entry'])
     for spec in config['checks'].values():
-        names.update([spec['source'], *spec.get('sources', [])])
+        names.update([*([spec['source']] if 'source' in spec else []), *spec.get('sources', [])])
     temporary = {**p, 'config': {'targets': {target: p['config'].get('targets', {}).get(target, {})}}}
     names.update(declared_files(temporary, [target]))
     parameters = {n for s in [*config['parts'].values(), *config['checks'].values(), *view['_target_spec'].get('stages', {}).values()] for n in s.get('parameters', [])}
@@ -198,18 +209,26 @@ def context(root):
     stale = any(routes[t]['stale'] for t in selected(p))
     safe = p['state'].get('safe_point')
     imports = read(p['root'] / '.geometryforge/import-state.json', {})
-    return {'project': str(p['root']), 'decisions': p['decisions'], 'parameters': p['parameters'],
-            'targets': routes, 'output_targets': selected(p), 'backends': routes[default]['backends'],
-            'safe_points': p['state'].get('safe_points', {}), 'safe_point': safe,
-            'safe_point_label': ('SAFE POINT — predates working edits' if stale else 'SAFE POINT') if safe else 'No aggregate safe point',
-            'latest_attempt': p['state'].get('latest_attempt'), 'unreal': imports,
-            'issues': p['state'].get('issues', []) + p['decisions'].get('unresolved', []),
-            'note': 'Each route has independent editable scenes and package evidence. Unreal verification is separate.'}
+    result = {'project': str(p['root']), 'decisions': p['decisions'], 'parameters': p['parameters'],
+              'targets': routes, 'output_targets': selected(p), 'backends': routes[default]['backends'],
+              'safe_points': p['state'].get('safe_points', {}), 'safe_point': safe,
+              'safe_point_label': ('SAFE POINT — predates working edits' if stale else 'SAFE POINT') if safe else 'No aggregate safe point',
+              'latest_attempt': p['state'].get('latest_attempt'), 'unreal': imports,
+              'issues': p['state'].get('issues', []) + p['decisions'].get('unresolved', []),
+              'note': 'Each route has independent editable scenes and package evidence. Unreal verification is separate.'}
+    from . import gates
+    if gates.declared(p):
+        summary = gates.status(root)
+        result['gates'] = summary
+        if summary['active_gate']:
+            result['issues'].append(f"Gate '{summary['active_gate']}' is active; later parts stay dormant until it is accepted")
+    return result
 
 
 def plan(root, backend=None, parts=(), full=False, source='auto', target=None, profile=None):
-    from . import engine
+    from . import engine, gates
     p = projects.load(root)
+    gates.require_buildable(p, parts)
     routes = selected(p, target)
     if profile and 'game' not in routes:
         raise ValueError('--profile requires the game target')
@@ -288,11 +307,17 @@ def execute(root, backend=None, parts=(), full=False, source='auto', timeout=900
                 route_data = {**data, 'backends': {}, 'validation': {}, 'decisions': view['decisions']}
                 item = {'status': 'running', 'backends': route_data['backends'], 'settings': view['_settings'],
                         'route_key': effective_key, 'failures': [], 'validation': route_data['validation']}
+                gate_state = view.get('_gates')
+                if gate_state:
+                    item['gates'] = {k: gate_state[k] for k in ('active', 'accepted', 'frontier', 'dormant')}
                 data['targets'][route] = item
                 pending = {}
                 try:
                     if route != 'design' and data['targets'].get('design', {}).get('status') not in (None, 'passed'):
                         raise engine.ScopeUncertain('Shared design did not pass; dependent route retained as candidate')
+                    if gate_state and route != gate_state['route'] and not gate_state['complete']:
+                        raise engine.ScopeUncertain(f"Modeling gates are incomplete (active: {gate_state['active']}); "
+                                                    f"the {route} route waits for the final accepted gate")
                     for b, original_spec in route_plan['backends'].items():
                         spec = deepcopy(original_spec)
                         pending_preparation=[name for name,stage in spec.get('stages',{}).items() if stage.get('pending')]
@@ -304,7 +329,7 @@ def execute(root, backend=None, parts=(), full=False, source='auto', timeout=900
                         if route != 'design' and current_design is not None and previous_backend.get('design_geometry') != current_design:
                             if source == 'scene' or source == 'auto' and (spec['manual_edits'] or previous_backend.get('native_edits')):
                                 raise engine.ScopeUncertain('Shared design changed; reconcile the target before verification or explicitly use --source code')
-                            spec['parts'] = sorted(view['config']['parts'])
+                            spec['parts'] = projects.build_order(view['config'], view['config']['parts'])
                             spec['source'] = 'code'
                             spec['stages'] = stage_plan(p,view,b,spec['parts'],previous_backend,source)
                         if spec['needs_choice']:
@@ -378,10 +403,34 @@ def execute(root, backend=None, parts=(), full=False, source='auto', timeout=900
 
 def migrate(root, format_version=2):
     p = projects.load(root)
-    if format_version != 2:
-        raise ValueError('Only migration to format 2 is supported')
-    if p['config']['format_version'] == 2:
-        return {'status': 'unchanged', 'format_version': 2}
+    if format_version not in (2, 3):
+        raise ValueError('Migration targets format 2 or 3')
+    current = p['config']['format_version']
+    if current >= format_version:
+        return {'status': 'unchanged', 'format_version': current}
+    if current == 1:
+        result = _migrate_v2(root)
+        if format_version == 2:
+            return result
+    import re
+    with exclusive(p['root'] / '.geometryforge'):
+        p = projects.load(root)
+        backup = p['root'] / '.geometryforge/migrations' / uuid.uuid4().hex[:12]
+        backup.mkdir(parents=True)
+        for name in ('project.toml', '.geometryforge/state.json'):
+            if inside(p['root'], name).is_file():
+                shutil.copy2(inside(p['root'], name), backup / Path(name).name)
+        contract = p['root'] / 'project.toml'
+        contract.write_text(re.sub(r'(?m)^(format_version[ \t]*=[ \t]*)2(?=[ \t]*(?:#.*)?$)', r'\g<1>3',
+                                   contract.read_text(encoding='utf-8'), count=1), encoding='utf-8')
+        write(p['root'] / '.geometryforge/state.json', {**p['state'], 'format_version': 3})
+    return {'status': 'migrated', 'format_version': 3, 'backup': str(backup),
+            'note': 'Format 3 enables [gates.*]. Every part must belong to a gate once gates are declared; '
+                    'see geometryforge gate template.'}
+
+
+def _migrate_v2(root):
+    p = projects.load(root)
     with exclusive(p['root'] / '.geometryforge'):
         p = projects.load(root)
         backup = p['root'] / '.geometryforge/migrations' / uuid.uuid4().hex[:12]
@@ -417,7 +466,7 @@ def derive(root, target, from_run, from_target, scale=1.0, backend=None, timeout
     from . import engine
     import math
     p = projects.load(root)
-    if p['config']['format_version'] != 2:
+    if p['config']['format_version'] < 2:
         raise ValueError('Migrate this project to format 2 before deriving')
     if target not in ('print', 'game') or from_target not in ROUTES:
         raise ValueError('Invalid derivation route')

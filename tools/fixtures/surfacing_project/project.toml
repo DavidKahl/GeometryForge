@@ -1,0 +1,103 @@
+format_version = 3
+
+[project]
+id = "surfacing_fixture"
+title = "Gated master-hull surfacing fixture"
+
+[backends.blender]
+entry = "models/blender.py"
+
+[parts.master_hull]
+sources = ["models/blender.py"]
+parameters = ["length_mm", "width_mm", "height_mm"]
+
+[parts.body]
+sources = ["models/blender.py"]
+parameters = ["panel_gap_mm", "panel_thickness_mm", "lamp_depth_mm", "lamp_draft_deg", "lamp_fillet_mm"]
+depends = ["master_hull"]
+
+[parts.skirt]
+sources = ["models/blender.py"]
+parameters = ["panel_gap_mm", "panel_thickness_mm"]
+depends = ["master_hull"]
+
+[parts.lens]
+sources = ["models/blender.py"]
+parameters = ["lens_lap_mm"]
+depends = ["body"]
+
+[checks.master_closed]
+kind = "global"
+parts = ["master_hull"]
+[checks.master_closed.spec]
+test = "open_edges"
+targets = [{part = "master_hull", roles = ["guide"]}]
+
+[checks.seam_body_skirt]
+kind = "seam"
+parts = ["body", "skirt", "master_hull"]
+[checks.seam_body_skirt.spec]
+a = {part = "body"}
+b = {part = "skirt"}
+master = {part = "master_hull"}
+
+[checks.recess_lamp]
+kind = "recess"
+parts = ["body", "master_hull", "lens"]
+[checks.recess_lamp.spec]
+panel = {part = "body"}
+master = {part = "master_hull"}
+ring = {part = "body", objects = ["_interface_lamp"]}
+contents = [{part = "lens"}]
+[checks.recess_lamp.thresholds]
+# The lamp opening is two cage faces with square plan corners; subdivision tightens the return to
+# ~2.7 mm right at those corners. Production openings carry more cage resolution and rounded corners.
+fillet_min_mm = 2.5
+
+[checks.coverage_hull]
+kind = "global"
+parts = ["body", "skirt", "master_hull"]
+[checks.coverage_hull.spec]
+test = "coverage"
+master = {part = "master_hull"}
+panels = [{part = "body"}, {part = "skirt"}]
+openings = [{part = "body", roles = ["interface"], objects = ["_interface_lamp"]}]
+[checks.coverage_hull.thresholds]
+# The cube cage puts valence-3 poles under the panels at eight tight corners; nearest-point
+# shrinkwrap leaves up to ~6 mm there at panel level 3. Real hulls keep poles off tight curvature.
+cover_tolerance_mm = 6.0
+
+[checks.mating_lens]
+kind = "mating"
+parts = ["body", "lens"]
+[checks.mating_lens.spec]
+parent = {part = "body", objects = ["_interface_lamp_seat"]}
+child = {part = "lens", objects = ["_interface_lens"]}
+skin = [{part = "body", objects = ["Body panel"]}]
+child_solids = [{part = "lens", objects = ["Lens"]}]
+[checks.mating_lens.thresholds]
+lap_min_mm = 4.5
+lap_max_mm = 5.5
+
+[targets.design]
+
+[targets.game]
+
+[gates.master]
+order = 0
+parts = ["master_hull"]
+checks = ["master_closed"]
+[gates.master.review]
+config = "reviews/master.json"
+modes = ["zebra", "silhouette"]
+min_views = 6
+
+[gates.panels]
+order = 1
+parts = ["body", "skirt"]
+checks = ["seam_body_skirt", "coverage_hull"]
+
+[gates.detail]
+order = 2
+parts = ["lens"]
+checks = ["recess_lamp", "mating_lens"]

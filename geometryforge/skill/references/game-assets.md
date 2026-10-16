@@ -12,6 +12,8 @@ Conventional defaults: 20,000 base triangles/output, two used material slots, 20
 
 ## Geometry and materials
 
+For close-up reference fidelity follow [surface modeling](surface-modeling.md) before material work. Review broad curvature, panels and mechanical detail separately. Dense source geometry and a technically valid package do not establish visual acceptance. Keep useful geometric seams and relief on the detailed master; reserve bake-only detail for features appropriate to the camera distance.
+
 Retain an editable detailed source. Choose silhouette-aware simplified construction or retopology for conventional meshes; decimation alone is not a general solution. Finalize render triangulation before UV authoring/baking. Blender unwrap retains the preparation construction separately and unwraps evaluated topology. Preserve seams, custom normals/tangents and material indices. Open render surfaces are permitted; UCX collision must be closed and convex.
 
 Use `api.pbr_material`, `finalize_mesh`, `unwrap`, `bake`, `lods` and `collision`, or direct native APIs. Blender baking supplies base color, tangent normals, roughness, metallic and AO with explicit source correspondence/settings. Bake one material region per helper call; author multiple-region workflows explicitly. Houdini baking executes a project-authored BAKE ROP rather than translating Blender shaders automatically.

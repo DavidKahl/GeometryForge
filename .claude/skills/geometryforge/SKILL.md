@@ -21,6 +21,8 @@ For destination conversion read [conversion](references/conversion.md). Author t
 
 Read [contracts](references/contracts.md) when authoring a project. Read [Blender](references/blender.md) or [Houdini](references/houdini.md) for the selected backends.
 
+For reference-driven hero geometry, follow the gated workflow below and read [surface modeling](references/surface-modeling.md). Direct native APIs are available beyond the supplied helpers. Passing technical validation does not establish reference fidelity. Protect intentional feature edges while rounding broad forms. Preserve accepted native components and verify their geometry when reusing them in a larger study.
+
 ## Reference intake
 
 When a new project starts from reference images, complete this intake before writing geometry code. It applies to every route.
@@ -32,7 +34,22 @@ When a new project starts from reference images, complete this intake before wri
    - *Enough reference:* give a final warning before starting: the assumptions you will make (every *guess*, and how you will resolve it), and which decisions will be expensive to change later. Ask for explicit acceptance. Do not model before it.
 4. **Record.** Copy the images into `references/` and store the review under `decisions.reference_review`: each reference's path, SHA-256 and view; the coverage map; `verdict` (`sufficient`, `insufficient` or `override`); requested views; assumptions; and who accepted, when. Until acceptance, keep `"Reference review not accepted"` in `decisions.unresolved` so `context` reports it. This is agent-maintained context, not an enforced schema.
 
+5. **Calibrate.** For the primary identity view, record 3D datums (pad centres, length and width extremes, nose tip) and their pixels in `references/correspondences.json`, feature curves (roofline, beltline, chine, mount centrelines) in `references/features.json`, and a white-on-black silhouette mask. Run `geometryforge calibrate` and inspect the overlay. Solve supplementary views against the same datums; one flagged `inconsistent` disagrees with the primary proportions, so do not model from it until it is normalized or replaced. Never quote a similarity score without a calibrated camera and a mask.
+
 New references arriving later reopen the review for the parts they show. Explain departures from the accepted assumptions instead of silently changing them.
+
+## Gated hard-surface workflow
+
+Multi-panel curved hulls (vehicles, housings, armour) are built top-down in a format 3 project (`migrate --format 3`; `gate template` prints a starting `[gates.*]` set). The toolkit enforces the order: only accepted gates and the active gate are buildable, later parts stay dormant, and accepted geometry is locked. Read [gates](references/gates.md) and [checks](references/checks.md).
+
+- **Gate 0, calibration:** the calibrated primary camera and feature cage from the reference intake.
+- **Gate 1, master hull:** one watertight low-poly cage for the whole exterior skin, with no openings, panel gaps or mechanical detail (`api.surf.master_hull`, regions naming future panels and openings, creases instead of support loops). Pass `global` checks (closed, calibrated silhouette IoU) and a zebra/silhouette/overlay review.
+- **Gate 2, panels:** slice every exterior panel from the master (`slice_panel`, `inset_panel_perimeter`, `build_guide_mesh_stack`). Never loft adjacent body panels independently. Pass `seam`, `coverage` and section reviews.
+- **Gate 3, detail:** mechanical parts bind to exported interface rings (`extract_interface_ring`, `bind_to_ring`), never to scalar datums; seat fasteners with `project_detail`. Pass `mating` and `recess` checks.
+
+Mechanical sockets, lamps and vents in curved bodywork never stand proud of the master unless the reference shows it, and never expose raw framing. Form a painted recessed return with `recessed_pocket_extrude` (guide weight 1 at the flush rim falling to 0 inside). Place races, webs, lenses and glands behind that return so only the purposeful interface shows.
+
+Critique the review sheets before reading metrics or check results: render with `review --blind`, write the critique to a file, then read `report.json` and the checks. Passing checks support but do not replace the critique. Run `gate check`, show the user the evidence, and run `gate accept --by <name> --note "<their words>" --critique <file>` only after their explicit approval. To change accepted geometry, `gate reopen` with a reason; later gates are superseded.
 
 ## Design for the target printer
 
@@ -46,7 +63,7 @@ Test uncertain features with a small representative section or fit coupon before
 
 Start each resumed modeling task with `context`. Native working files, parameter choices, stale outputs and safe points belong to the project, not conversation memory. Read the referenced latest/safe run when its detailed evidence matters.
 
-Run `geometryforge plan <project>` before execution. Use the smallest meaningful part selection; maintain source, parameter, dependency and interface-check declarations as geometry evolves. A new run record does not imply rebuilding the whole model. Example: `geometryforge run <project> --parts nose_tip`.
+Run `geometryforge plan <project>` before execution. Use the smallest meaningful part selection within the active gate; maintain source, parameter, dependency and check declarations as geometry evolves. A new run record does not imply rebuilding the whole model. Example: `geometryforge run <project> --parts nose_tip`. Locked and dormant parts are refused; a changed locked part makes the run a candidate. For edits inside a part, compare `part_id`/`normal` reviews with `review-diff` so unedited regions provably stay unchanged. Measure joints and seams with typed checks (`seam`, `recess`, `mating`, `global`); a Boolean overlap only proves that parts touch.
 
 In v2 choose `--target game|print|both` and the game `--profile` as needed. Inspect stage coverage and per-route safe points. Material preparation, baking, LOD and collision recipes are explicitly authored project code; `verify --full` never runs their builders. If recipes or required preparation changed, rebuild or reconcile before calling a package current. Save texture edits and declare imported texture dependencies.
 
@@ -60,4 +77,4 @@ For game deliverables supply the game package ZIP, manifest, FBX meshes/LODs/col
 
 ## Both native backends
 
-Build meaningful Blender structures and Houdini SOP networks with shared named interfaces. A mesh imported into a second app is not equivalent native construction. After manual changes, retain both versions, identify which is authoritative, and ask about ambiguous reconciliation. Reconcile through explicit project recipes or native edits; never claim automatic history translation. A partial backend run remains a candidate until every requested backend is current and passes shared checks.
+Build meaningful Blender structures and Houdini SOP networks with shared named interfaces. A mesh imported into a second app is not equivalent native construction. After manual changes, retain both versions, identify which is authoritative, and ask about ambiguous reconciliation. Reconcile through explicit project recipes or native edits; never claim automatic history translation. A partial backend run remains a candidate until every requested backend is current and passes shared checks. Typed checks measure evaluated evidence from either backend identically; check [houdini](references/houdini.md) for the surfacing helpers' parity status before promising them there. Gate reviews render the Blender scene.

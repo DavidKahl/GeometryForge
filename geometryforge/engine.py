@@ -8,7 +8,7 @@ import uuid
 import sys
 from . import __version__
 from .storage import digest, fingerprint, read, write, inside
-from .projects import load, inputs, part_inputs, closure, save_state, PACKAGE
+from .projects import load, inputs, part_inputs, closure, save_state, build_order, PACKAGE, SURFACE_CHECKS
 from .locking import exclusive
 
 def run_path(project, ident):
@@ -29,7 +29,7 @@ def selected_backends(project):
 
 def context(root):
     p = load(root)
-    if p['config']['format_version'] == 2:
+    if p['config']['format_version'] >= 2:
         from .targets import context as target_context
         return target_context(root)
     current = inputs(p)
@@ -57,7 +57,7 @@ def context(root):
 
 def plan(root, backend=None, parts=(), full=False, source="auto", target=None, profile=None, _project=None):
     p = _project or load(root)
-    if p['config']['format_version'] == 2:
+    if p['config']['format_version'] >= 2:
         from .targets import plan as target_plan
         return target_plan(root, backend, parts, full, source, target, profile)
     if target not in (None, 'print') or profile:
@@ -85,7 +85,7 @@ def plan(root, backend=None, parts=(), full=False, source="auto", target=None, p
         native_edits = set(prior.get('native_edits', []))
         unresolved = bool(source == 'auto' and changed and (manual or changed.intersection(native_edits)))
         chosen = 'scene' if source == 'scene' or (source == 'auto' and (manual or not changed)) else 'code'
-        results[b] = {"parts": sorted(changed), "source": chosen, "inspect_saved_scene": bool(state.get("working")),
+        results[b] = {"parts": build_order(p["config"], changed), "source": chosen, "inspect_saved_scene": bool(state.get("working")),
                       "full_verification": full, "manual_edits": manual, "needs_choice": unresolved,
                       "reason": "Both procedural inputs and native file changed; choose --source scene or --source code explicitly" if unresolved else "Inspect evaluated parts, then select affected checks"}
     return {"backends": results, "requested_parts": list(parts), "full": full}
@@ -128,7 +128,7 @@ def artifact(p, path):
 
 def execute(root, backend=None, parts=(), full=False, source="auto", timeout=900, executables=None, target=None, profile=None):
     p = load(root)
-    if p['config']['format_version'] == 2:
+    if p['config']['format_version'] >= 2:
         from .targets import execute as target_execute
         return target_execute(root, backend, parts, full, source, timeout, executables, target, profile)
     if target not in (None, 'print') or profile:
@@ -217,6 +217,12 @@ def execute_backend(p, data, out, frozen, backend, spec, full, timeout, executab
     result = run_native(backend, directory, frozen / p["config"]["backends"][backend]["entry"], data["parameters"], rebuild, scene, timeout, executable)
     grouped = objects_by_part(result["objects"])
     known = set(p["config"]["parts"])
+    gates = p.get("_gates")
+    if gates and gates["route"] == p.get("_target"):
+        # A reopened gate leaves later-gate objects in the scene; they stay unbuilt and unmeasured.
+        for name in set(grouped) - known:
+            if name in gates["dormant"]:
+                grouped.pop(name)
     if set(grouped) != known:
         raise ScopeUncertain(f"Scene part IDs differ from project: missing {sorted(known-set(grouped))}, extra {sorted(set(grouped)-known)}. Update the part/check contract before verification.")
     target = p.get('_target', 'print')
@@ -229,6 +235,13 @@ def execute_backend(p, data, out, frozen, backend, spec, full, timeout, executab
             raw=next((a for a in prior.get('parts',{}).get(name,{}).get('artifacts',[]) if a['path'].endswith('/assembly.json')),None)
             if raw and artifact_ok(p,raw) and evidence_equivalent(objects,read(inside(p['root'],raw['path']))['objects']):
                 hashes[name]=prior['geometry'][name]
+    if gates and gates["route"] == p.get("_target"):
+        moved = sorted(name for name, accepted in gates["locked"].items()
+                       if accepted.get(backend) is not None and hashes.get(name) != accepted[backend])
+        if moved:
+            owners = sorted({gates["owner"][n] for n in moved})
+            raise ScopeUncertain(f"Locked geometry of accepted gate(s) {owners} changed: {moved}. Restore it, or run "
+                                 f"geometryforge gate reopen to change it deliberately.")
     changed = {name for name in known if hashes[name] != prior.get("geometry", {}).get(name)}
     affected = closure(p["config"], changed | set(rebuild))
     if scene and spec["source"] == "code" and changed - set(rebuild):
@@ -288,7 +301,10 @@ def execute_backend(p, data, out, frozen, backend, spec, full, timeout, executab
         info["parts"][name] = {"key": key, "reused": False, "artifacts": [artifact(p, f) for f in files], "measurements": report["parts"][0], "assembly_bounds_mm": bounds}
     for name, check in p["config"].get("checks", {}).items():
         dependencies = {part: hashes[part] for part in check["parts"]}
-        checker_hashes = {s: digest(frozen / s) for s in [check["source"], *check.get("sources", [])]}
+        entry = SURFACE_CHECKS if check.get("kind") else frozen / check["source"]
+        checker_hashes = {s: digest(frozen / s) for s in [*([check["source"]] if "source" in check else []), *check.get("sources", [])]}
+        if check.get("kind"):
+            checker_hashes["<geometryforge>/surface_checks.py"] = digest(SURFACE_CHECKS)
         key = fingerprint([dependencies, checker_hashes, {k: data["parameters"][k] for k in check.get("parameters", [])}, check, tool_key])
         old = prior.get("checks", {}).get(name, {})
         if not full and old.get("key") == key and old.get("passed"):
@@ -298,12 +314,15 @@ def execute_backend(p, data, out, frozen, backend, spec, full, timeout, executab
                    'backend': backend,
                    'target': target, 'settings': p.get('_settings', {}),
                    'derivation': data['decisions'].get('derivations', {}).get(target)}
+        if check.get("kind"):
+            payload.update(kind=check["kind"], spec=check.get("spec", {}), thresholds=check.get("thresholds", {}),
+                           mode=check["mode"], previous=old or None, snapshot_root=str(frozen))
         payload_path = directory / "checks" / f"{name}-input.json"
         write(payload_path, payload)
         report_path = directory / "checks" / f"{name}.json"
         from .process import run
         from .worker_env import worker_environment
-        code = run([sys.executable, PACKAGE / "check_worker.py", frozen / check["source"], payload_path, report_path], cwd=frozen, env=worker_environment(), log=directory / "checks" / f"{name}.log", timeout=timeout)
+        code = run([sys.executable, PACKAGE / "check_worker.py", entry, payload_path, report_path], cwd=frozen, env=worker_environment(), log=directory / "checks" / f"{name}.log", timeout=timeout)
         check_result = read(report_path, {"passed": False, "error": "Checker exited without a result"})
         info["checks"][name] = {**check_result, "key": key, "reused": False}
         if code or not check_result["passed"]:
@@ -344,7 +363,7 @@ def parity(p, data):
 
 def restore(root, ident=None, target=None):
     p = load(root)
-    if p['config']['format_version'] == 2:
+    if p['config']['format_version'] >= 2:
         from .targets import restore as target_restore
         return target_restore(root, ident, target)
     with exclusive(p["root"] / ".geometryforge"):
@@ -371,7 +390,7 @@ def restore(root, ident=None, target=None):
 
 def adopt(root, backend, file, target=None):
     p = load(root)
-    if p['config']['format_version'] == 2:
+    if p['config']['format_version'] >= 2:
         from .targets import adopt as target_adopt
         if not target:
             raise ValueError('v2 adopt requires --target to preserve route ownership')

@@ -1,12 +1,12 @@
-# Project contract v2
+# Project contract v2 and v3
 
-v1 remains supported without changing its print semantics. v2 adds independent `output_targets` in decisions.json, containing `game`, `print` or both. Native `deliverables` retains its v1 meaning. All internal geometry is in millimeters.
+v1 remains supported without changing its print semantics. v3 is v2 plus toolkit-enforced modeling [gates](gates.md); v2 projects behave exactly as before. v2 adds independent `output_targets` in decisions.json, containing `game`, `print` or both. Native `deliverables` retains its v1 meaning. All internal geometry is in millimeters.
 
 ## Target configuration
 
 Keep stable design IDs in `[parts.<id>]`. `[targets.design]` is optional shared source construction. Delivery targets can override backend entrypoints through `[targets.game.backends.blender]` (or print/Houdini), each with `entry`. If design is configured it builds/verifies before requested delivery routes. Cross-route transformations always use frozen derivation provenance, not cyclic live dependencies.
 
-Without `outputs`, a route uses the declared part IDs. `[targets.game.outputs.<id>]` or the corresponding print table can merge/split identities using `source_parts`, sources, parameters and depends. Only declared source part IDs are allowed. Route-level `sources` are shared geometry inputs. Global checks may declare `targets`; a route's `checks = ["id"]` restricts its required checks. Check payloads add `target`, `settings` and `derivation` to the v1 payload.
+Without `outputs`, a route uses the declared part IDs. `[targets.game.outputs.<id>]` or the corresponding print table can merge/split identities using `source_parts`, sources, parameters and depends. Only declared source part IDs are allowed. Route-level `sources` are shared geometry inputs. Global checks may declare `targets`; a route's `checks = ["id"]` restricts its required checks. Checks run on the design route only when they list it in `targets`. A check may name a packaged `kind` (seam, recess, mating, global) instead of a `source`; see [typed checks](checks.md). Check payloads add `target`, `settings` and `derivation` to the v1 payload.
 
 Game profile and budget choices belong in decisions.game or `[targets.game]`; target contract settings take precedence. CLI `--profile` overrides only the effective run settings and is retained in that run; it does not rewrite project preferences.
 
@@ -18,7 +18,7 @@ Only changed stages and their declared dependents run. `verify --source scene`/`
 
 ## Native API and evidence
 
-`api.target` is design/print/game; `api.profile` contains effective route choices. `api.register_output(obj, output_id, role, source_parts=[...], **metadata)` adds representation registration. Roles: design, high_detail, render, lod, collision, printable, construction, presentation. `finish` remains a printable convenience. Shared source scenes are available as `api.design_scene`; `load_design` appends/merges retained native construction. Blender `scale_design` transforms the whole construction including Boolean operands; scaling only a final object can change its cuts.
+`api.target` is design/print/game; `api.profile` contains effective route choices. `api.register_output(obj, output_id, role, source_parts=[...], **metadata)` adds representation registration. Roles: design, high_detail, render, lod, collision, printable, construction, presentation, guide (hidden master surfaces; design evidence, never rendered or exported) and interface (edge-only mating rings). Design evidence carries `point_attributes` (surfacing weights, `gf_*` point attributes) only for objects that have them. `finish` remains a printable convenience. Shared source scenes are available as `api.design_scene`; `load_design` appends/merges retained native construction. Blender `scale_design` transforms the whole construction including Boolean operands; scaling only a final object can change its cuts.
 
 Game evidence contains triangles with per-corner UV layers, normals/tangents and optional colors, compact material assignments, asset-local coordinates, world placement and destination metadata. A game output ID has one render mesh plus its LOD/collision representations. Metadata includes `lod`, `sockets` (name and local `position_mm`), collision policy, optional `nanite=false` for a conventional section, and `uv_mode="tiled"` where intentional UV overlap is required. Unique atlases are the default; secondary/lightmap UVs stay unique.
 

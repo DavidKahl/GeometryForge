@@ -3,7 +3,9 @@ import math
 import json
 from pathlib import Path
 
-ROLES = {'design', 'high_detail', 'render', 'lod', 'collision', 'printable', 'construction', 'presentation'}
+# guide: hidden master surfaces and feature cages (design evidence, never rendered or exported).
+# interface: edge-only mating rings that children bind to.
+ROLES = {'design', 'high_detail', 'render', 'lod', 'collision', 'printable', 'construction', 'presentation', 'guide', 'interface'}
 
 
 class Context:
@@ -83,7 +85,7 @@ class Blender(Context):
         if role == 'printable':
             self.finish(obj, bodies=metadata.pop('bodies', 1), rotation=metadata.pop('rotation', (0,0,0)), filament=metadata.pop('filament', 1))
         else:
-            name = 'Design' if role in ('design', 'high_detail') else 'Game'
+            name = 'Design' if role in ('design', 'high_detail') else 'Guides' if role in ('guide', 'interface') else 'Game'
             collection = bpy.data.collections.get(name) or bpy.data.collections.new(name)
             if collection.name not in bpy.context.scene.collection.children:
                 bpy.context.scene.collection.children.link(collection)
@@ -94,9 +96,17 @@ class Blender(Context):
         obj['gf_part'] = output_id
         obj['gf_role'] = role
         obj['gf_metadata'] = json.dumps({'source_parts': source_parts or [self.part], **metadata}, allow_nan=False)
-        obj.hide_set(role in ('collision', 'high_detail', 'design'))
-        obj.hide_render = role in ('collision', 'high_detail', 'design')
+        obj.hide_set(role in ('collision', 'high_detail', 'design', 'guide', 'interface'))
+        obj.hide_render = role in ('collision', 'high_detail', 'design', 'guide', 'interface')
         return obj
+
+    @property
+    def surf(self):
+        """Master-hull surfacing helpers (geometryforge.blender_surfacing)."""
+        from .blender_surfacing import Surfacing
+        if getattr(self, '_surf', None) is None:
+            self._surf = Surfacing(self)
+        return self._surf
 
     def load_design(self):
         """Append retained native construction, rather than importing a baked mesh."""
@@ -221,6 +231,12 @@ class Houdini(Context):
         finish(obj, material('GeometryForge',(.32,.65,.61)), rotation=rotation, part=self.part, filament=filament, bodies=bodies)
         obj.geo.layoutChildren()
         return obj
+
+    @property
+    def surf(self):
+        raise NotImplementedError('The master-hull surfacing helpers (api.surf) are Blender-only in this release. '
+                                  'Build the Houdini master, panels and rings as SOP networks and register them with the '
+                                  'guide and interface roles; typed checks and gates measure Houdini evidence the same way.')
 
     def register_output(self, obj, output_id=None, role='render', source_parts=None, **metadata):
         if role not in ROLES:

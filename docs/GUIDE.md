@@ -122,8 +122,13 @@ All commands print JSON. Exit code `0` means success, `2` a failed, cancelled or
 | `geometryforge register [DIR]` | Adds an existing project to the viewer catalog |
 | `geometryforge viewer [--port 8743]` | Starts the local viewer |
 | `geometryforge session status\|stop` | Inspects or stops the managed Houdini session |
+| `geometryforge migrate [DIR] --format 2\|3` | Backs up and upgrades a project; format 3 enables modeling gates |
+| `geometryforge calibrate [DIR] [--camera ID …] [--dry-run]` | Solves reference cameras from `references/correspondences.json` and writes overlays |
+| `geometryforge gate status\|check\|accept\|reopen\|template …` | Inspects, checks, accepts or reopens modeling gates (format 3) |
+| `geometryforge review DIR --scene … --config … [--blind] [--baseline ID]` | Renders read-only appearance evidence |
+| `geometryforge review-diff DIR --before ID --after ID --parts …` | Fails if pixels outside the edited parts changed between two reviews |
 
-`--parts` selects parts to rebuild; everything that depends on them follows automatically. `--full` ignores reusable evidence and reruns every export and check. Run `geometryforge <command> --help` for every option.
+`--parts` selects parts to rebuild; everything that depends on them follows automatically, and parts are built dependencies first. `--full` ignores reusable evidence and reruns every export and check. Run `geometryforge <command> --help` for every option.
 
 ## Editing native files by hand
 
@@ -227,6 +232,124 @@ def verify(payload):
 | `GEOMETRYFORGE_HOUDINI` | Houdini executable or installation folder |
 | `GEOMETRYFORGE_BAMBU` | Bambu Studio executable (optional) |
 | `GEOMETRYFORGE_HOME` | Where the viewer's project catalog and the Houdini session state live (default `~/.geometryforge`) |
+
+## Gated hard-surface workflow
+
+Curved multi-panel assets such as vehicles, housings and armour go wrong in two predictable ways when an agent models them in code. One monolithic mesh stays simplistic, because every local detail loop disturbs the whole hull. Many independently built pieces drift apart, because they are placed by coordinates and nothing ties their curvature together. A format 3 project makes the agent work top-down, and the toolkit enforces the order:
+
+| Gate | Builds | Must pass before acceptance |
+|---|---|---|
+| 0 calibration | a solved camera for the primary reference, feature curves | RMS reprojection error within `max_rms_px`, current image and picks |
+| 1 master hull | one hidden, watertight low-poly cage for the whole exterior | closed mesh, calibrated silhouette IoU, zebra/silhouette/overlay review |
+| 2 panels | panels sliced from the master and shrinkwrapped back onto it; recessed pockets | seam, coverage (and recess) checks |
+| 3 detail | mechanical parts bound to interface rings exported by their parents | mating and recess checks |
+
+Only accepted gates and the active gate can be built; later parts are dormant, and `run --parts` on them is refused. Accepting a gate records its evidence under `.geometryforge/gates/` and locks its geometry. A run that changes locked geometry becomes a candidate. `gate reopen` releases it and supersedes later gates. Game and print routes wait until the final gate is accepted.
+
+```powershell
+geometryforge migrate projects/taxi --format 3
+geometryforge gate template            # prints a [gates.*] starting point
+geometryforge calibrate projects/taxi  # after recording correspondences.json
+geometryforge gate check projects/taxi calibration
+geometryforge gate accept projects/taxi calibration --by Dave --note "Dave: overlay matches, go"
+geometryforge run projects/taxi --target design
+geometryforge review projects/taxi --scene … --config projects/taxi/reviews/master.json --blind
+geometryforge gate check projects/taxi master
+```
+
+`gate accept` requires `--by` and a `--note` quoting the approval. The agent must only run it after you have approved the evidence; the toolkit can verify the evidence, not who approved it.
+
+### Calibration
+
+`references/correspondences.json` lists, per camera, the image, an optional crop and mask, lens priors and picked points:
+
+```json
+{"version": 1, "cameras": {"primary": {
+  "role": "primary", "image": "references/front_right_3q.png", "mask": "references/front_right_3q_mask.png",
+  "priors": {"lens_mm": null, "sensor_width_mm": 36},
+  "points": [{"id": "pad_fl", "world_mm": [1425, -720, 0], "pixel": [412.5, 803.0]},
+             {"id": "nose", "world_mm": {"param": "datum_nose_mm"}, "pixel": [1290.0, 610.0]}]}}}
+```
+
+Use at least six well-spread datums, or four or more with a known lens. Masks are white object on black, or use an alpha channel. `calibrate` writes `references/cameras.json` and an overlay image showing picks (red), reprojections (blue), feature curves from `references/features.json` (green) and the datum box (yellow). Supplementary views solved against the same datums are flagged `inconsistent` when they disagree with the primary proportions. Review views can then use `"camera": {"ref": "primary"}`.
+
+### Surfacing helpers and typed checks
+
+Blender recipes get `api.surf`: `master_hull`, `slice_panel`, `inset_panel_perimeter`, `build_guide_mesh_stack` (Subdivision → Shrinkwrap onto the master → Solidify → weighted Bevel), `recessed_pocket_extrude`, `extract_interface_ring`, `local_ring`, `bind_to_ring`, `project_detail`, plus `patch`, `loft` and `sweep`. Everything stays an editable modifier stack. In Houdini, build equivalent SOP networks and register them with the `guide` and `interface` roles; the helpers themselves are Blender-only for now.
+
+Checks can name a packaged `kind` instead of a checker file:
+
+```toml
+[checks.seam_front_skirt]
+kind = "seam"                 # seam | recess | mating | global
+parts = ["front_body", "skirt", "master_hull"]
+[checks.seam_front_skirt.spec]
+a = {part = "front_body"}
+b = {part = "skirt"}
+master = {part = "master_hull"}
+```
+
+**seam** measures how far the panel skin leaves the master, plus step, gap, tangent break and curvature mismatch across the joint. **recess** measures protrusion beyond the master, rim flushness, wall draft and the return's fillet radius. **mating** measures ring axis, centre offset, engagement lap and skin crossings. **global** runs `open_edges`, `coverage` (master area no panel covers) or calibrated `silhouette_iou`. Defaults live in `parameters.json` under `gf_thresholds`, can be overridden per check, and are recorded with every result. The defaults are starting values from an unverified engineering report; tune them to the asset. The [checks reference](../geometryforge/skill/references/checks.md) lists every measure, and [`tools/fixtures/surfacing_project`](../tools/fixtures/surfacing_project) is a complete three-gate example.
+
+## Reference and geometry review
+
+For close-up reference assets, establish proportions and compound curvature before panel structure, mechanical detail, materials and optimization. The [surface-modeling reference](../geometryforge/skill/references/surface-modeling.md) covers the master-hull workflow, quad subdivision cages, surface-derived panels, thickness, swept trim and selective Boolean cuts. Blender's Python API is available beyond GeometryForge's helpers.
+
+Render a saved scene without rebuilding, saving or adopting it:
+
+```powershell
+geometryforge review projects/my_asset --scene projects/my_asset/working/model.blend --config projects/my_asset/review-views.json
+```
+
+Set `GEOMETRYFORGE_BLENDER` or pass `--blender <executable>`. The `--timeout` default is 900 seconds for the whole subprocess. Scene/config CLI paths are relative to the calling directory; reference paths are relative to the project and must remain inside it. Review outputs are written to a new `review/<timestamp-id>/` folder; existing evidence is retained. The command never runs project recipes, modifies a source scene or promotes a safe point.
+
+```json
+{
+  "version": 1,
+  "views": [{
+    "id": "front",
+    "selection": {"parts": ["body"]},
+    "camera": {
+      "position_mm": [8000, -10000, 5000],
+      "target_mm": [0, 0, 1200],
+      "projection": "perspective",
+      "lens_mm": 50,
+      "sensor_width_mm": 36,
+      "up": [0, 0, 1]
+    },
+    "studio": {"center_mm": [0, 0, 1200], "size_mm": 7000},
+    "resolution": [1280, 960],
+    "samples": 16,
+    "modes": ["clay", "glossy", "silhouette", "wireframe"],
+    "reference": "references/front.png",
+    "reference_crop": [0, 0, 1024, 768],
+    "notes": "Primary identity view; photographic camera matching is approximate."
+  }]
+}
+```
+
+Use unique lowercase view IDs with underscores. Cameras and geometry are interpreted in millimeters; source scenes with metric unit scaling are normalized in memory. For orthographic views set `projection` to `orthographic` and provide positive `ortho_scale_mm`. The default is a 50 mm perspective camera with a 36 mm sensor and Z up. Camera direction and up must be nonparallel.
+
+`selection` can contain `parts` (stable `gf_part` values), `objects` (exact object names), or both; both selectors form a union. Omit it to review all eligible geometry. Explicit design/high-detail/render/printable objects and visible untagged mesh/curve/surface/text geometry are eligible. Collection and Geometry Nodes instances are expanded from the evaluated dependency graph using their world transforms. Construction, presentation, collision and LOD helpers are excluded. Unknown/non-renderable selectors fail with details in the retained Blender log. References/crops are optional; crops are `[left, top, right, bottom]` pixels. Resolution defaults to 1280×960 (32–4096 per dimension), samples to 16 (1–256), and all four modes are enabled by default.
+
+Evidence includes the neutral images, reference contact sheets, saved normalized camera settings, source/config/reference hashes, Blender version, evaluated object/triangle counts and artifact hashes. Render subdivision levels are used. The CPU Cycles studio uses a fixed seed and view-relative strip lights; source textures, materials, cameras and lights are ignored. Wireframe shows evaluated topology rather than the sparse source cage. Silhouette is a black foreground on white, composed from holdout alpha. For matched before/after lighting, give both views the same optional `studio.center_mm` and positive `studio.size_mm`; without them the rig fits each selection's bounds. The report records the effective studio placement and renderer source hash. Runtime failures retain `report.json` and any available log/images. Invalid configuration or missing input files fail before launching Blender or creating a review folder.
+
+Additional review options:
+
+- **Diagnostic modes.**
+  - `zebra`: reflection stripes. Positional breaks make bands jump, tangent breaks make them kink, and curvature-continuous surfaces keep them flowing. Set `zebra.stripes` and `zebra.rotation_deg`.
+  - `normal` and `part_id`: exact, unfiltered pixels, used by `review-diff`.
+  - `overlay`: feature curves and the selection box projected onto a render and, for calibrated views, onto the reference.
+- **Sections.** `"section": {"axis": "x", "offset_mm": 2400, "keep": "negative"}` cuts the evaluated copies for X-ray checks of closure and wall thickness.
+- **Guide objects.** `selection.roles` adds hidden `guide` objects such as the master hull.
+- **Presets.** `"presets": [{"preset": "survey21", "bounds_mm": [[…], […]] | "safe_point", "camera_refs": ["primary"]}]` adds 6 orthographic, 8 three-quarter, calibrated, 3 section and 3 close-up views. `standard6` and a configurable `survey` are also available.
+- **Silhouette IoU.** Calculated only for views with a mask (`camera.ref` with a calibrated mask, or `reference_mask`). It is compared with the latest earlier review using the same camera and mask (or `--baseline ID`) and recorded under `metrics`. No score is produced for uncalibrated photographs without a mask.
+- **Blind output.** `--blind` keeps metrics off the contact sheets and out of the command output. Write the visual critique first, then read `report.json`.
+- **Region invariance.** `review-diff --before ID --after ID --parts front_body` compares the `part_id` and `normal` renders of two reviews made with the same cameras. Pixels outside the edited parts, plus `--margin-px`, must not change.
+
+Inspect the images and record remaining differences. Use identical camera settings for before/after comparison. A technically validated run is not visual acceptance; generated alternate views and meshes remain interpretations of the primary image. Preserve the detailed master and optimize a derived copy only after reviewing its shape.
+
+Convex forms can still have intentional hard features. Keep top/chamfer/side breaks explicit and round only their small manufacturing radii. Bind mating parts to interface rings rather than scalar datums, and measure them with `mating` checks. Machinery in curved bodywork sits behind a painted recessed return (`recessed_pocket_extrude`) instead of standing proud of the skin. The load path (housing, races, webs into a beam or bulkhead) stays behind that return, visible only where the reference shows it. A Boolean clearance provides space for an assembly, not its mechanical purpose.
 
 ## Troubleshooting
 

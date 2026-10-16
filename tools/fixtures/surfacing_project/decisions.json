@@ -1,0 +1,10 @@
+{
+  "brief": "Dedicated native fixture for the gated master-hull workflow",
+  "intended_use": "game asset",
+  "units": "mm",
+  "deliverables": "blender",
+  "execution_backend": "blender",
+  "output_targets": ["game"],
+  "game": {"profile": "unreal_desktop_standard"},
+  "unresolved": []
+}

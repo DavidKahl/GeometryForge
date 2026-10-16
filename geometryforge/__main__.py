@@ -52,7 +52,28 @@ def main():
     p.add_argument('--target', choices=['print','game','design'], help='Working-scene route (required for v2)')
     p = sub.add_parser('migrate', help='Back up and upgrade a legacy project contract')
     p.add_argument('project', nargs='?', default='.')
-    p.add_argument('--format', type=int, choices=[2], default=2)
+    p.add_argument('--format', type=int, choices=[2,3], default=2, help='3 enables modeling gates')
+    p = sub.add_parser('calibrate', help='Solve reference cameras from references/correspondences.json')
+    p.add_argument('project', nargs='?', default='.')
+    p.add_argument('--camera', nargs='*', default=None, help='Camera IDs to solve (default: all)')
+    p.add_argument('--dry-run', action='store_true', help='Report the solution without writing cameras.json or overlays')
+    p = sub.add_parser('gate', help='Inspect, check, accept or reopen modeling gates (format 3)')
+    gate_commands = p.add_subparsers(dest='gate_command', required=True)
+    for name, text in {'status': 'List gates, the active gate and dormant parts', 'check': 'Report whether a gate is ready to accept (read-only)',
+                       'accept': 'Record an approved gate and lock its geometry', 'reopen': 'Reopen an accepted gate and supersede later ones',
+                       'template': 'Print a four-gate project.toml template'}.items():
+        g = gate_commands.add_parser(name, help=text)
+        if name != 'template':
+            g.add_argument('project', nargs='?' if name == 'status' else None, default='.')
+        if name in ('check', 'accept', 'reopen'):
+            g.add_argument('gate')
+        if name in ('accept', 'reopen'):
+            g.add_argument('--by', required=True, help='Who approved (accept) or asked to reopen')
+        if name == 'accept':
+            g.add_argument('--note', required=True, help="Quote the person's approval")
+            g.add_argument('--critique', help='Visual critique written before reading metrics (copied into the record)')
+        if name == 'reopen':
+            g.add_argument('--reason', required=True)
     p = sub.add_parser('derive', help='Execute a declared conversion recipe from a retained source')
     p.add_argument('project', nargs='?', default='.')
     p.add_argument('--target', choices=['print','game'], required=True)
@@ -73,6 +94,21 @@ def main():
         p.add_argument('--backend', choices=['blender','houdini'], default='blender')
         p.add_argument('--editor', help='Editor executable or engine installation')
         p.add_argument('--timeout', type=int, default=1200)
+    p = sub.add_parser('review', help='Render reference comparisons without changing scenes or safe points')
+    p.add_argument('project', nargs='?', default='.')
+    p.add_argument('--scene', required=True, help='Saved Blender scene (relative to calling directory)')
+    p.add_argument('--config', required=True, help='Versioned JSON review views (relative to calling directory)')
+    p.add_argument('--blender', help='Blender executable (overrides GEOMETRYFORGE_BLENDER)')
+    p.add_argument('--timeout', type=int, default=900, help='Maximum seconds for the review subprocess')
+    p.add_argument('--blind', action='store_true', help='Omit metrics from sheets and output; critique first, then read report.json')
+    p.add_argument('--baseline', help='Earlier review ID for silhouette IoU deltas (default: latest matching view)')
+    p = sub.add_parser('review-diff', help='Check that pixels outside edited parts did not change between two reviews')
+    p.add_argument('project', nargs='?', default='.')
+    p.add_argument('--before', required=True, help='Review ID before the edit')
+    p.add_argument('--after', required=True, help='Review ID after the edit')
+    p.add_argument('--parts', nargs='+', required=True, help='Edited part IDs')
+    p.add_argument('--margin-px', type=int, default=1, help='Dilation of the edited region in pixels')
+    p.add_argument('--tolerance', type=int, default=0, help='Allowed 8-bit channel difference')
     p = sub.add_parser('viewer', help='Start the local browser viewer (http://127.0.0.1:8743)'); p.add_argument('--port', type=int, default=8743, help='Port to listen on')
     p = sub.add_parser('session', help='Inspect or stop the managed Houdini session'); p.add_argument('action', choices=['status','stop'])
     args=parser.parse_args()
@@ -105,12 +141,34 @@ def main():
         elif args.command == 'migrate':
             from .targets import migrate
             result=migrate(args.project,args.format)
+        elif args.command == 'calibrate':
+            from .camera import calibrate
+            result=calibrate(args.project,args.camera,args.dry_run)
+        elif args.command == 'gate':
+            from . import gates
+            if args.gate_command == 'status':
+                result=gates.status(args.project)
+            elif args.gate_command == 'check':
+                result=gates.check(args.project,args.gate)
+                result['status']='passed' if result['ready'] else 'candidate'
+            elif args.gate_command == 'accept':
+                result=gates.accept(args.project,args.gate,args.by,args.note,args.critique)
+            elif args.gate_command == 'reopen':
+                result=gates.reopen(args.project,args.gate,args.by,args.reason)
+            else:
+                result=gates.template()
         elif args.command == 'derive':
             from .targets import derive
             result=derive(args.project,args.target,args.from_run,args.from_target,args.scale,args.backend,args.timeout,{'blender':args.blender,'houdini':args.houdini})
         elif args.command == 'unreal':
             from .unreal import execute
             result=execute(args.project,args.uproject,args.run,args.backend,args.editor,args.timeout,args.import_id,args.unreal_command in ('verify','review'),args.unreal_command=='review')
+        elif args.command == 'review':
+            from .review import execute
+            result=execute(args.project,args.scene,args.config,args.blender,args.timeout,args.blind,args.baseline)
+        elif args.command == 'review-diff':
+            from .review import diff
+            result=diff(args.project,args.before,args.after,args.parts,args.margin_px,args.tolerance)
         elif args.command == 'session':
             from .houdini import current, request, terminate
             current_session=current()

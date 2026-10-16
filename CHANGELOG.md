@@ -2,6 +2,45 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [semantic versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Format 3 modeling gates:** `[gates.*]` order calibration, master hull, panels and detail.
+  - Only accepted gates and the active gate are buildable; later parts are dormant and refused.
+  - Accepted geometry is locked; a changed locked part makes the run a candidate.
+  - `gate status|check|accept|reopen|template` manages them. Acceptance records hashes, check measurements, review and calibration evidence, critique and the quoted approval.
+  - Dependent game/print routes wait for the final gate.
+  - `migrate --format 3`.
+- **Typed surface checks** (`kind = seam | recess | mating | global`), run on evaluated evidence from either backend:
+  - master deviation, seam step/gap/tangent/curvature;
+  - pocket protrusion, rim flushness, draft and return fillet;
+  - ring axis/centre/lap and skin crossings;
+  - open edges, master coverage and calibrated silhouette IoU with delta.
+  - Thresholds layer toolkit defaults (starting values from an unverified engineering report), `parameters.json` `gf_thresholds` and per-check overrides. They are recorded with results and are cache inputs. Measure mode records misses without failing runs.
+- **Reference camera calibration:** `geometryforge calibrate` solves Blender-compatible cameras (pose, focal length, optional principal point) from datum correspondences. It writes `references/cameras.json` and reprojection overlays, and flags supplementary views that disagree with the primary.
+- **Review additions:**
+  - `zebra`, `normal`, `part_id` and `overlay` modes; section cuts; calibrated `camera.ref` views; guide-role selection;
+  - `survey21`/`standard6`/`survey` presets;
+  - silhouette IoU with baseline deltas;
+  - `--blind` output;
+  - `review-diff` region-invariance checks.
+- **`api.surf` Blender surfacing helpers:** master hull with regions and creases, conforming panel slicing, perimeter control loops with seam gaps, the Subdivision→Shrinkwrap→Solidify→Bevel guide stack, drafted recessed pockets, interface ring extraction, ring binding, detail projection, patch/loft/sweep. `geometryforge.sections` has the shared ring/section math.
+- **New roles:** `guide` (hidden master surfaces) and `interface` (edge-only rings). Design evidence carries surfacing point attributes only when present, so existing evidence hashes are unchanged. Houdini extraction supports both roles; `api.surf` is Blender-only for now.
+- Dedicated three-gate native fixture (`tools/fixtures/surfacing_project`) and opt-in native surfacing test.
+- Skill: calibration intake step, gated workflow, recessed-fairing rule, interface-ring binding, blind critique before metrics; new `gates.md` and `checks.md` references; rewritten surface-modeling reference.
+
+### Fixed
+
+- Recipes now receive parts dependencies-first. Alphabetical order could build a dependent part against geometry that its dependency's rebuild then deleted.
+- Failed project checks keep their measurements in the run record instead of only an error string.
+
+- `geometryforge review`: disposable Blender rendering of saved scenes with repeatable cameras, part/object selection, clay/glossy/silhouette/wireframe images, reference contact sheets and hashed provenance. Review does not run builders, save scene edits or change safe points; failed reviews retain evidence.
+- Reference-driven surface-modeling guidance covering compound curvature, subdivision cages, surface-derived panels, swept trim, real geometric detail, staged visual review and detail-preserving optimization.
+- Dedicated native review fixture and input/provenance/failure regression tests.
+- Isolated hover-taxi geometry study with front body, one pad and one rear engine; original taxi construction and runs preserved.
+- Full-taxi advanced study reusing accepted native pads, with protected engine facets, a seated exhaust collar and mechanical receiving housings. Surface-modeling guidance now covers feature-edge protection, shared mating sections and visible structural load paths.
+
 ## [1.1.0] - 2026-10-14
 
 ### Added

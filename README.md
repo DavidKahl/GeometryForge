@@ -24,6 +24,8 @@ How GeometryForge came to be, from hand-modeled chess pieces to agent-built, val
 - **Print-ready output.** Each part is exported as STL and 3MF in its print orientation and checked for watertightness, volume, bed fit and an STL/3MF round trip. Projects add their own fit and interface checks.
 - **Multi-material 3MF.** Every run also writes the whole model as one 3MF: an assembled version for judging colours and a print kit with every part. With [Bambu Studio](https://bambulab.com/en/download/studio) installed, the kit becomes a ready-to-slice project with plates and filament colours.
 - **A local viewer.** Browse projects and runs, isolate parts, compare any two runs side by side or as an overlay, view renders and download files.
+- **Reference geometry review.** Render saved Blender scenes as clay, glossy, silhouette, wireframe and zebra comparisons from repeatable or calibrated cameras, including section cuts, a 21-view survey and region-invariance diffs. Retain hashed evidence without changing native scenes or safe points; see [the review guide](docs/GUIDE.md#reference-and-geometry-review).
+- **Gated hard-surface workflow.** Format 3 projects build curved hulls top-down: calibrated reference, one locked master hull, panels shrinkwrapped to it, then detail bound to interface rings. Typed checks measure seams, pockets and joints instead of mere contact; see [the gated workflow](docs/GUIDE.md#gated-hard-surface-workflow).
 - **No AI service of its own.** GeometryForge has no API keys, model provider or chat. Your existing agent does the thinking; GeometryForge does deterministic execution and bookkeeping.
 
 ## Requirements

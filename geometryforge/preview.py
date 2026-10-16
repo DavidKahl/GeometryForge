@@ -7,10 +7,15 @@ def preview(objects, path):
     draw = ImageDraw.Draw(image)
     polygons = []
     for obj in objects:
+        if not obj.get("faces"):
+            continue  # interface rings and other edge-only evidence
         v = np.asarray(obj["vertices"])
         projection = np.column_stack((.707*(v[:,0]-v[:,1]), .408*(v[:,0]+v[:,1])-.816*v[:,2]))
         for face in obj["faces"]:
             polygons.append((float(v[face].sum()), projection[face]))
+    if not polygons:
+        image.save(path)
+        return
     points = np.concatenate([p for _,p in polygons])
     low, high = points.min(0), points.max(0)
     scale = min(580/max(high[0]-low[0],1), 420/max(high[1]-low[1],1))

@@ -10,8 +10,11 @@ if __name__ == "__main__":
     sys.path.insert(0, str(entry.parent))
     try:
         result = runpy.run_path(str(entry))["verify"](json.loads(payload.read_text(encoding="utf-8")))
-        if not isinstance(result, dict) or result.get("passed") is not True:
+        if not isinstance(result, dict):
             raise ValueError(f"Checker must return passed=true and measurements: {result}")
+        if result.get("passed") is not True:
+            # Keep the measurements of a failed check; they say what to fix.
+            result = {**result, "passed": False, "error": f"Checker must return passed=true and measurements: {result}"}
     except BaseException:
         result = {"passed": False, "error": traceback.format_exc()}
     output.write_text(json.dumps(result), encoding="utf-8")
