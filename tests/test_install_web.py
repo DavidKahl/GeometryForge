@@ -69,3 +69,40 @@ def test_references_endpoint_lists_views_and_serves_only_reference_images(projec
     assert served.status_code == 200 and served.headers['content-disposition'].startswith('inline')
     assert client.get(f'/api/projects/{key}/artifact', params={'path': 'references/cameras.json'}).status_code == 404
     assert client.get(f'/api/projects/{key}/artifact', params={'path': 'references/../decisions.json'}).status_code == 404
+
+
+def test_viewer_mesh_packs_corner_and_indexed_objects():
+    import numpy as np
+    from geometryforge.viewer_mesh import pack_objects, unpack
+    vertices = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0]]
+    faces = [[0, 1, 2], [1, 3, 2]]
+    normals = [[[0, 0, 1]] * 3, [[0, 0, -1]] * 3]
+    design = {'role': 'design', 'vertices': vertices, 'faces': faces, 'corner_normals': normals, 'face_materials': [1, 0],
+              'uv_layers': {'UVMap': [[[0, 0], [1, 0], [0, 1]], [[1, 0], [1, 1], [0, 1]]]}, 'materials': [{'id': 'A'}, {'id': 'B'}],
+              'matrix_world': np.eye(4).tolist(), 'metadata': {'lod': 0, 'feature': 'plate'}}
+    printable = {'vertices': vertices, 'faces': faces, 'filament': 2}
+    (entry, arrays), (plain, plain_arrays) = unpack(pack_objects([design, printable]))
+    # Corner-expanded and ordered by face material: material 0 (the second face) first, as the viewer draws groups.
+    np.testing.assert_allclose(arrays['position'].reshape(-1, 3, 3)[0], np.asarray(vertices)[faces[1]])
+    np.testing.assert_allclose(arrays['normal'].reshape(-1, 3, 3)[0], normals[1])
+    np.testing.assert_allclose(arrays['uv'].reshape(-1, 3, 2)[1], [[0, 0], [1, 0], [0, 1]])
+    assert entry['groups'] == [[0, 3, 0], [3, 3, 1]] and entry['materials'] == ['A', 'B'] and entry['metadata'] == {'lod': 0}
+    assert 'index' not in arrays and plain['filament'] == 2
+    np.testing.assert_array_equal(plain_arrays['index'], np.ravel(faces))
+    np.testing.assert_allclose(plain_arrays['position'], np.ravel(vertices))
+
+
+def test_mesh_endpoint_serves_only_run_evidence(project):
+    from geometryforge.viewer_mesh import unpack
+    root, _ = project
+    result = engine.execute(root)
+    key = projects.register(root)['key']
+    client = TestClient(create_app())
+    assembly = next(a['path'] for part in result['backends']['blender']['parts'].values() for a in part['artifacts'] if a['path'].endswith('assembly.json'))
+    served = client.get(f'/api/projects/{key}/mesh', params={'path': assembly})
+    assert served.status_code == 200 and served.headers['content-type'] == 'application/octet-stream'
+    assert len(unpack(served.content)) >= 1
+    assert list((root / '.geometryforge/cache/viewer').glob('*.gfm'))
+    assert client.get(f'/api/projects/{key}/mesh', params={'path': assembly}).content == served.content   # cached
+    assert client.get(f'/api/projects/{key}/mesh', params={'path': 'decisions.json'}).status_code == 404
+    assert client.get(f'/api/projects/{key}/mesh', params={'path': '../secret.txt'}).status_code == 400

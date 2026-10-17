@@ -16,6 +16,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+- **Viewer loads large design parts:** parts now load as compact binary meshes (`GET /api/projects/{key}/mesh`, `geometryforge/viewer_mesh.py`), converted once per evidence file and cached under `.geometryforge/cache/viewer/`. Detailed design evidence reached 572 MB of JSON per part, which browsers could not fetch and parse; a detailed gated project's 1.75 GB of part JSON is 214 MB as binary and loads in about 4 s.
 - **Shell guard:** at a tight pocket corner, or along a strip thinner than the panel, Solidify's simple offset could carry inner-shell vertices out through the skin. `build_guide_mesh_stack` now adds an INSIDE shrinkwrap on the inner shell after Solidify, so only such vertices move back onto the master.
 
 ## [1.2.0] - 2026-10-16

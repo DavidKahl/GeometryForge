@@ -35,24 +35,32 @@ export const natural=new Intl.Collator(undefined,{numeric:true}).compare;
 // Geometry is cached per artifact URL: switching runs, backends or views never re-downloads a part.
 const geometryCache=new Map<string,Promise<{geometries:THREE.BufferGeometry[];filaments:number[];rotation:number[];meshInfo:MeshInfo[]}>>();
 export function clearCache(){for(const entry of geometryCache.values())void entry.then(e=>e.geometries.forEach(g=>g.dispose()),()=>{});geometryCache.clear()}
+// Parts load as compact binary meshes (geometryforge/viewer_mesh.py): detailed design evidence is hundreds of megabytes of
+// JSON, which a browser cannot parse, while the binary buffers map straight into BufferAttributes.
+export const meshURL=(path:string)=>`/api/projects/${session.key}/mesh?path=${encodeURIComponent(path)}`;
+type MeshEntry={role?:string;filament?:number;print_rotation_deg?:number[];matrix_world?:number[][];materials:(string|null)[];
+  metadata:{lod?:number;sockets?:MeshInfo['sockets']};groups?:number[][];buffers:Record<string,[number,number]>};
 function geometry(path:string){
-  const url=artifactURL(path);let entry=geometryCache.get(url);
+  const url=meshURL(path);let entry=geometryCache.get(url);
   if(!entry){
-    entry=fetch(url).then(r=>{if(!r.ok)throw Error(`Could not load ${fileName(path)}`);return r.json()}).then(data=>{
-      type Evidence={vertices:number[][];faces:number[][];print_rotation_deg?:number[];filament?:number;role?:string;uv_layers?:Record<string,number[][][]>;corner_normals?:number[][][];corner_tangents?:number[][][];face_materials?:number[];materials?:{id:string}[];matrix_world?:number[][];metadata?:{lod?:number;sockets?:MeshInfo['sockets']}};
-      const objects:Evidence[]=data.objects;
-      const geometries=objects.map(obj=>{const g=new THREE.BufferGeometry();
-        if(obj.role&&obj.corner_normals?.length){
-          const order=obj.faces.map((_,i)=>i).sort((a,b)=>(obj.face_materials?.[a]??0)-(obj.face_materials?.[b]??0));
-          g.setAttribute('position',new THREE.Float32BufferAttribute(order.flatMap(index=>obj.faces[index].flatMap(i=>obj.vertices[i])),3));
-          g.setAttribute('normal',new THREE.Float32BufferAttribute(order.flatMap(i=>obj.corner_normals![i].flat()),3));
-          const uv=Object.values(obj.uv_layers??{})[0];if(uv)g.setAttribute('uv',new THREE.Float32BufferAttribute(order.flatMap(i=>uv[i].flat()),2));
-          if(obj.corner_tangents?.length)g.setAttribute('tangent',new THREE.Float32BufferAttribute(order.flatMap(i=>obj.corner_tangents![i].flat()),4));
-          let start=0;for(let i=0;i<=order.length;i++){if(i===order.length||(obj.face_materials?.[order[i]]??0)!==(obj.face_materials?.[order[start]]??0)){g.addGroup(start*3,(i-start)*3,obj.face_materials?.[order[start]]??0);start=i}}
+    entry=fetch(url).then(r=>{if(!r.ok)throw Error(`Could not load ${fileName(path)}`);return r.arrayBuffer()}).then(data=>{
+      if(new TextDecoder().decode(new Uint8Array(data,0,4))!=='GFM1')throw Error(`${fileName(path)} is not a viewer mesh`);
+      const length=new DataView(data).getUint32(4,true);
+      const objects:MeshEntry[]=JSON.parse(new TextDecoder().decode(new Uint8Array(data,8,length))).objects;
+      const base=8+length+((4-(8+length)%4)%4);
+      const floats=(slice:[number,number])=>new Float32Array(data,base+slice[0],slice[1]);
+      const geometries=objects.map(obj=>{const g=new THREE.BufferGeometry();const b=obj.buffers;
+        g.setAttribute('position',new THREE.BufferAttribute(floats(b.position),3));
+        if(b.index){g.setIndex(new THREE.BufferAttribute(new Uint32Array(data,base+b.index[0],b.index[1]),1));g.computeVertexNormals()}
+        else{
+          g.setAttribute('normal',new THREE.BufferAttribute(floats(b.normal),3));
+          if(b.uv)g.setAttribute('uv',new THREE.BufferAttribute(floats(b.uv),2));
+          if(b.tangent)g.setAttribute('tangent',new THREE.BufferAttribute(floats(b.tangent),4));
+          for(const [start,count,material] of obj.groups??[])g.addGroup(start,count,material);
           if(obj.matrix_world)g.applyMatrix4(new THREE.Matrix4().set(...obj.matrix_world.flat() as Parameters<THREE.Matrix4['set']>));
-        }else{g.setAttribute('position',new THREE.Float32BufferAttribute(obj.vertices.flat(),3));g.setIndex(obj.faces.flat());g.computeVertexNormals()}
+        }
         g.computeBoundingBox();return g});
-      const meshInfo=objects.map(obj=>{const matrix=obj.matrix_world?new THREE.Matrix4().set(...obj.matrix_world.flat() as Parameters<THREE.Matrix4['set']>):new THREE.Matrix4();return {role:obj.role??'printable',lod:obj.metadata?.lod??0,materialIds:(obj.materials??[]).map(m=>m.id),pivot:obj.matrix_world?.map(r=>r[3]).slice(0,3)??[0,0,0],sockets:(obj.metadata?.sockets??[]).map(s=>({...s,world_position_mm:new THREE.Vector3().fromArray(s.position_mm).applyMatrix4(matrix).toArray()}))}});
+      const meshInfo=objects.map(obj=>{const matrix=obj.matrix_world?new THREE.Matrix4().set(...obj.matrix_world.flat() as Parameters<THREE.Matrix4['set']>):new THREE.Matrix4();return {role:obj.role??'printable',lod:obj.metadata?.lod??0,materialIds:obj.materials.map(m=>m??''),pivot:obj.matrix_world?.map(r=>r[3]).slice(0,3)??[0,0,0],sockets:(obj.metadata?.sockets??[]).map(s=>({...s,world_position_mm:new THREE.Vector3().fromArray(s.position_mm).applyMatrix4(matrix).toArray()}))}});
       return {geometries,filaments:objects.map(o=>o.filament??1),rotation:objects[0]?.print_rotation_deg??[0,0,0],meshInfo};
     });
     entry.catch(()=>geometryCache.delete(url));geometryCache.set(url,entry);

@@ -115,6 +115,17 @@ def create_app():
         # inline lets the viewer show images and logs in place; downloads stay the default.
         return FileResponse(target,filename=target.name,content_disposition_type='inline' if inline else 'attachment')
 
+    @app.get('/api/projects/{key}/mesh')
+    def mesh(key: str, path: str):
+        """A part's evidence JSON as a compact binary mesh (see viewer_mesh), converted once and cached."""
+        from .viewer_mesh import cached
+        root=project(key)
+        target=inside(root,path)
+        evidence=any(target.is_relative_to((root/'.geometryforge'/folder).resolve()) for folder in ('runs','imports'))
+        if not evidence or target.suffix.lower()!='.json' or not target.is_file():
+            raise HTTPException(404,'Mesh evidence not found')
+        return FileResponse(cached(root,target),media_type='application/octet-stream')
+
     app.mount('/',StaticFiles(directory=PACKAGE/'web_dist',html=True),name='viewer')
     return app
 

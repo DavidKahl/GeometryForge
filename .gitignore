@@ -14,3 +14,8 @@ validation-workspace/
 
 # Local-only projects (not part of the public showcase)
 projects/office_led_hub_v2/
+projects/hover_taxi/
+projects/hover_taxi_advanced_study/
+projects/hover_taxi_geometry_study/
+projects/hover_taxi_gated_adv/
+projects/low_poly_fleet/
