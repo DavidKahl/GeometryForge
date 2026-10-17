@@ -10,7 +10,13 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Orthographic calibration:** cameras with `"projection": "orthographic"` and a `"view"` (front, back, left, right, top, bottom) are solved by a linear similarity fit of scale, offset and roll from three or more datums. Silhouette scores, overlays and `camera.ref` review views work for every clean view.
 - **Detail checks (`kind = "detail"`):** an accepted inventory of `{id, feature, min_count}` items, with optional `region_mm`, `relief_mm` and `density_min_per_m2`. Each separate mesh island of objects tagged with the feature counts once, and must sit within `seat_mm` (default 1.0) of the parent skin. The final geometry gate must declare a detail check before `gate check` is ready, so detail can no longer drop out while every surface check passes.
 - **Detail primitives in `api.surf`:** `fillet`, `lathe` (full or sector), `rounded_box`, `prism`, `bolts` (one island per head, tagged `bolt`), `ribbed_tube`, `pane` (curved glass or lens in a seat ring) and `seat_on_surface`. `local_ring` takes `z` and `axis`. The native surfacing fixture adds a seated bolt row and a detail check.
+- **Wells and region unions:** `api.surf.open_well` turns an opening that crosses panel lines (a vent across a seam, a lamp in a corner) into its own recessed insert: the region is sliced as a panel with the seam gap, its interior opened, and `recessed_pocket_extrude(floor=True|False)` falls it off into a closed well or an open seat. `slice_panel` slices the union of a list of master regions and exports extra metadata (`feature=` tags for detail inventories).
+- **Seam check `region_mm`:** measures one stretch of a seam, for example away from a three-panel corner whose rounding opens the gap.
 - **Clean reference sets:** reference intake starts with six orthographic, neutrally lit views on a plain background. `geometryforge references masks` writes silhouette masks (alpha or border colour). `references check` cross-checks length, width and height between views and reports disagreement against `gf_thresholds.references.view_disagreement_pct` (default 3%). New skill reference `clean-references.md` with per-view prompt templates and an acceptance checklist.
+
+### Fixed
+
+- **Shell guard:** at a tight pocket corner, or along a strip thinner than the panel, Solidify's simple offset could carry inner-shell vertices out through the skin. `build_guide_mesh_stack` now adds an INSIDE shrinkwrap on the inner shell after Solidify, so only such vertices move back onto the master.
 
 ## [1.2.0] - 2026-10-16
 
