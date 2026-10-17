@@ -29,7 +29,7 @@ Measures the flush exterior skin: vertices within `exterior_band_mm` of the mast
 | `normal_angle_p95_deg` | 2.5 | tangent break across the seam, beyond the master's own turn |
 | `curvature_ratio_p95` | 0.08 | `|κa−κb| / max(κa+κb, 2·flat_curvature_per_mm)`, probed `probe_mm` (15) across the seam |
 
-Seam pairs are mutual nearest border vertices; fewer than `min_pairs` means the parts do not share a seam. Vertices are measured, so chords between them can still sag: pair seams with a `coverage` check. Curvature flatter than `flat_curvature_per_mm` (R ≥ 2 m by default) is compared against that floor, because two nearly flat sides differ only by discretization noise.
+Seam pairs are mutual nearest border vertices; fewer than `min_pairs` means the parts do not share a seam. An optional `region_mm = [[x0, y0, z0], [x1, y1, z1]]` in the spec measures one stretch of the seam, for example away from a junction with a well that its own `recess` check covers. Vertices are measured, so chords between them can still sag: pair seams with a `coverage` check. Curvature flatter than `flat_curvature_per_mm` (R ≥ 2 m by default) is compared against that floor, because two nearly flat sides differ only by discretization noise.
 
 ## recess: pockets, lamps, sockets
 

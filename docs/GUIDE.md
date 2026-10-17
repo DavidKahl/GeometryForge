@@ -123,6 +123,7 @@ All commands print JSON. Exit code `0` means success, `2` a failed, cancelled or
 | `geometryforge viewer [--port 8743]` | Starts the local viewer |
 | `geometryforge session status\|stop` | Inspects or stops the managed Houdini session |
 | `geometryforge migrate [DIR] --format 2\|3` | Backs up and upgrades a project; format 3 enables modeling gates |
+| `geometryforge references masks\|check [DIR] [--threshold N] [--dry-run]` | Writes silhouette masks for clean reference views, or cross-checks their length, width and height |
 | `geometryforge calibrate [DIR] [--camera ID …] [--dry-run]` | Solves reference cameras from `references/correspondences.json` and writes overlays |
 | `geometryforge gate status\|check\|accept\|reopen\|template …` | Inspects, checks, accepts or reopens modeling gates (format 3) |
 | `geometryforge review DIR --scene … --config … [--blind] [--baseline ID]` | Renders read-only appearance evidence |
@@ -152,6 +153,8 @@ When a project produces both Blender and Houdini files, a safe point needs both 
 - **Parts** tab: filter, show/hide, and select parts. Numbered parts (`fin_1…fin_4`) are grouped. Ctrl/Shift-click to select several.
 - **Runs** tab: open any run as **A**. **Compare with A** puts another run beside it as **B**, side by side with a shared camera or as an orange overlay. The strip above the view lists changed, added and removed parts.
 - **Isolate** (⛶, double-click or `I`) shows the selected parts in their own scene, in assembly or print orientation. In comparison mode, a part missing from B is reported as such.
+- **References** tab: a project's reference images with their calibration RMS. Clicking a calibrated view looks along its camera and lays the reference over the model with adjustable opacity; orbiting returns to the normal view.
+- **Guides** shows hidden guide surfaces such as master hulls and interface rings, which otherwise stay out of the way of the panels covering them.
 - **Part colours / Filaments** recolours the model by planned filament.
 - **Renders** open in an image viewer with zoom; downloads are always explicit. **Files & logs** has the whole-model 3MFs, each part's STL/3MF, the native scene and the application log.
 
@@ -242,7 +245,7 @@ Curved multi-panel assets such as vehicles, housings and armour go wrong in two 
 | 0 calibration | a solved camera for the primary reference, feature curves | RMS reprojection error within `max_rms_px`, current image and picks |
 | 1 master hull | one hidden, watertight low-poly cage for the whole exterior | closed mesh, calibrated silhouette IoU, zebra/silhouette/overlay review |
 | 2 panels | panels sliced from the master and shrinkwrapped back onto it; recessed pockets | seam, coverage (and recess) checks |
-| 3 detail | mechanical parts bound to interface rings exported by their parents | mating and recess checks |
+| 3 detail | mechanical parts bound to interface rings exported by their parents | mating, recess and detail checks |
 
 Only accepted gates and the active gate can be built; later parts are dormant, and `run --parts` on them is refused. Accepting a gate records its evidence under `.geometryforge/gates/` and locks its geometry. A run that changes locked geometry becomes a candidate. `gate reopen` releases it and supersedes later gates. Game and print routes wait until the final gate is accepted.
 
@@ -273,15 +276,17 @@ geometryforge gate check projects/taxi master
 
 Use at least six well-spread datums, or four or more with a known lens. Masks are white object on black, or use an alpha channel. `calibrate` writes `references/cameras.json` and an overlay image showing picks (red), reprojections (blue), feature curves from `references/features.json` (green) and the datum box (yellow). Supplementary views solved against the same datums are flagged `inconsistent` when they disagree with the primary proportions. Review views can then use `"camera": {"ref": "primary"}`.
 
+Prefer a clean reference set: six orthographic, neutrally lit views (front, back, left, right, top, bottom) on a plain background; the [clean references guide](../geometryforge/skill/references/clean-references.md) has prompt templates and an acceptance checklist. `geometryforge references masks` writes `references/mask_<view>.png` from transparency or the border colour, and `references check` reports how far the views disagree on length, width and height (`gf_thresholds.references.view_disagreement_pct`, default 3%). Give such cameras `"projection": "orthographic"` and a `"view"`; they are solved by a similarity fit of scale, offset and roll from three or more datums, and silhouette scores, overlays and `camera.ref` review views work for each of them.
+
 ### Surfacing helpers and typed checks
 
-Blender recipes get `api.surf`: `master_hull`, `slice_panel`, `inset_panel_perimeter`, `build_guide_mesh_stack` (Subdivision → Shrinkwrap onto the master → Solidify → weighted Bevel), `recessed_pocket_extrude`, `extract_interface_ring`, `local_ring`, `bind_to_ring`, `project_detail`, plus `patch`, `loft` and `sweep`. Everything stays an editable modifier stack. In Houdini, build equivalent SOP networks and register them with the `guide` and `interface` roles; the helpers themselves are Blender-only for now.
+Blender recipes get `api.surf`: `master_hull`, `slice_panel`, `inset_panel_perimeter`, `build_guide_mesh_stack` (Subdivision → Shrinkwrap onto the master → Solidify → weighted Bevel), `recessed_pocket_extrude`, `extract_interface_ring`, `local_ring`, `bind_to_ring`, `project_detail`, plus `patch`, `loft` and `sweep`. `slice_panel` also slices the union of several master regions, and `open_well` turns an opening that crosses panel lines (a vent across a seam, a lamp in a corner) into its own recessed insert. Detail primitives build real detail geometry: `fillet`, `lathe`, `rounded_box`, `prism`, `bolts`, `ribbed_tube`, `pane` (curved glass or a lens in a seat ring) and `seat_on_surface`. Everything stays an editable modifier stack. In Houdini, build equivalent SOP networks and register them with the `guide` and `interface` roles; the helpers themselves are Blender-only for now.
 
 Checks can name a packaged `kind` instead of a checker file:
 
 ```toml
 [checks.seam_front_skirt]
-kind = "seam"                 # seam | recess | mating | global
+kind = "seam"                 # seam | recess | mating | global | detail
 parts = ["front_body", "skirt", "master_hull"]
 [checks.seam_front_skirt.spec]
 a = {part = "front_body"}
@@ -289,7 +294,7 @@ b = {part = "skirt"}
 master = {part = "master_hull"}
 ```
 
-**seam** measures how far the panel skin leaves the master, plus step, gap, tangent break and curvature mismatch across the joint. **recess** measures protrusion beyond the master, rim flushness, wall draft and the return's fillet radius. **mating** measures ring axis, centre offset, engagement lap and skin crossings. **global** runs `open_edges`, `coverage` (master area no panel covers) or calibrated `silhouette_iou`. Defaults live in `parameters.json` under `gf_thresholds`, can be overridden per check, and are recorded with every result. The defaults are starting values from an unverified engineering report; tune them to the asset. The [checks reference](../geometryforge/skill/references/checks.md) lists every measure, and [`tools/fixtures/surfacing_project`](../tools/fixtures/surfacing_project) is a complete three-gate example.
+**seam** measures how far the panel skin leaves the master, plus step, gap, tangent break and curvature mismatch across the joint. **recess** measures protrusion beyond the master, rim flushness, wall draft and the return's fillet radius. **mating** measures ring axis, centre offset, engagement lap and skin crossings. **global** runs `open_edges`, `coverage` (master area no panel covers) or calibrated `silhouette_iou`. **detail** checks an accepted inventory of `{id, feature, min_count}` items: each separate mesh island tagged with the feature counts once and must sit within `seat_mm` (default 1.0) of its parent skin. The final geometry gate must declare a detail check, so detail can't drop out while every surface check passes. Seam checks take `region_mm` to measure one stretch of a seam. Defaults live in `parameters.json` under `gf_thresholds`, can be overridden per check, and are recorded with every result. The defaults are starting values from an unverified engineering report; tune them to the asset. The [checks reference](../geometryforge/skill/references/checks.md) lists every measure, and [`tools/fixtures/surfacing_project`](../tools/fixtures/surfacing_project) is a complete three-gate example.
 
 ## Reference and geometry review
 

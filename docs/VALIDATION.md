@@ -2,6 +2,40 @@
 
 What has actually been verified, on what, and when. Nothing here claims a physical print. Native validation has only been done on Windows.
 
+## Gated advanced hover taxi (16-17 October 2026, branch `clean-references-detail`)
+
+A second real-project run of the four gates in Blender 5.2.1 LTS (a local project that isn't published in this repository; design route only), from a clean six-view orthographic reference set and with detail measured by checks. Gates 0 and 1 were accepted by the user. Gates 2 and 3 were accepted under the user's explicit delegation while they were away, with every threshold recorded as set on their behalf for later review. Native runs, in order:
+
+- **Gate 0:**
+  - `references masks|check` on the six clean views. They disagree by up to 15%, so an accepted authority rule decides which view governs which measurement.
+  - Orthographic calibration: right and left at 0.07 px RMS, top at 4.2 px (limit 5 px).
+- **Gate 1 master hull:** closed. Silhouette IoU 0.898 right, 0.893 left, 0.975 top (limits 0.88 / 0.88 / 0.95).
+- **Gate 2 panels:** about 60 panels, chrome plates and wells.
+  - 14 seam checks on the stretches away from three-panel corners (seam `region_mm`): painted gaps 1.5-3.1 mm, chrome 6.3-7.1 mm, steps at most 0.005 mm.
+  - Eight recess checks; one vertex 1.14 mm proud at the rear bumper corner.
+  - Coverage complete within 14 mm (body) and 9 mm (nacelles).
+  - A Gate 2 detail inventory share: 18 plates, 4 doors, 10 panels, 2 modules, 2 armour shells.
+- **Gate 3 detail:** five detail checks, each against the skin its pieces sit on:
+  - exterior: 31/31 items, 140 pieces;
+  - mounted: 7/7;
+  - pads: 48 band segments, 96 slots, 4 emitters;
+  - fasteners: 292 bolts;
+  - interior: 4 seats.
+
+  No piece floats more than 1 mm. Complete-model silhouette IoU 0.948 right, 0.943 left, 0.958 top.
+- **Re-verification:** `run --source scene` after the final acceptance reused all 37 checks.
+- **Toolkit changes from this run, each committed with tests:**
+  - orthographic calibration, clean reference masks and checks, the `detail` check kind with the final-gate rule, detail primitives, and the viewer References tab (03b0039, e6c510c, 7fba815, de9eba5, 0d82198);
+  - `open_well` and seam `region_mm` (a477e51);
+  - `slice_panel` region unions and the `open_well` interior-edge fix (6960131);
+  - the `Shell guard` against solidified shells folding out at tight corners (71cdf81).
+
+  After the last change, the native surfacing fixture passed and the host suite passed: 167 tests, 4 skipped.
+
+Game route: built in four Nanite runs on 17 October; none reached `passed` (the last ended as a candidate), so no game package from this project is verified. The practices it produced are written up in [game assets](GAME_ASSETS.md#hero-assets-on-nanite) as guidance, not as validated delivery.
+
+Not run: Houdini; a physical reference (the clean views are generated images).
+
 ## Gated hover taxi rebuild (16 October 2026, branch `hover-taxi-gated`)
 
 A real-project run of the format 3 gates in Blender 5.2.1 LTS ([`projects/hover_taxi_gated`](../projects/hover_taxi_gated/README.md), design route only). Every gate was accepted by the user after its blind review. Native runs, in order:

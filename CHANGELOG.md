@@ -14,6 +14,12 @@ All notable changes to this project are documented here. The format follows [Kee
 - **Seam check `region_mm`:** measures one stretch of a seam, for example away from a three-panel corner whose rounding opens the gap.
 - **Clean reference sets:** reference intake starts with six orthographic, neutrally lit views on a plain background. `geometryforge references masks` writes silhouette masks (alpha or border colour). `references check` cross-checks length, width and height between views and reports disagreement against `gf_thresholds.references.view_disagreement_pct` (default 3%). New skill reference `clean-references.md` with per-view prompt templates and an acceptance checklist.
 
+### Documentation
+
+- **Hero assets on Nanite:** game-asset guidance in the skill and `docs/GAME_ASSETS.md`. It covers render meshes derived from the retained design at a lower subdivision level, outputs split to the triangle budget, mesh clean-up before unwrapping, glass and interior LODs, and strictly convex k-DOP collision.
+- **Known limitation:** `api.bake` bakes base colour with Cycles' DIFFUSE colour pass, which scales by (1 − metallic), so bare metal bakes black. It doesn't bake emissive maps. Both workarounds are documented.
+- README and user guide cover clean reference sets, `references masks|check`, orthographic calibration, detail checks, detail primitives, `open_well`, and the viewer's References tab and Guides toggle.
+
 ### Fixed
 
 - **Viewer loads large design parts:** parts now load as compact binary meshes (`GET /api/projects/{key}/mesh`, `geometryforge/viewer_mesh.py`), converted once per evidence file and cached under `.geometryforge/cache/viewer/`. Detailed design evidence reached 572 MB of JSON per part, which browsers could not fetch and parse; a detailed gated project's 1.75 GB of part JSON is 214 MB as binary and loads in about 4 s.

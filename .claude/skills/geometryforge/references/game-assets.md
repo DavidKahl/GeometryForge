@@ -24,6 +24,17 @@ Conventional LODs preserve placement/pivots and shading. Modular assets add meas
 
 Nanite retains useful geometric detail but still has material, storage, instance and hardware costs. Explicitly split unsupported materials into conventional outputs. Configure fallback behavior and validate it in the destination engine. Never label an arbitrary dense print mesh Nanite-ready.
 
+## Hero assets on Nanite
+
+These practices come from a gated hero vehicle taken to the Nanite profile. Its game runs never reached `passed`, so treat them as guidance and verify each one with your own checks.
+
+- **Render meshes come from the retained design.** Evaluate the accepted design with its panel subdivision at a lower game level (for example 2 instead of 3), and merge the evaluated objects per output in world space. Bevels, seams, bolts and louvres stay real geometry; decimation would erase them. Keep the full-level design objects in the scene as bake sources.
+- **Split outputs to fit the budget.** Group parts into outputs (body, lower hull, details, drives, pads) so each stays within 250k triangles. Declare glass and interior as conventional outputs (`nanite=False`), because Nanite does not render translucency. Give purely decorative outputs no collision.
+- **Base colour from `api.bake` darkens metal.** The helper bakes base colour with Cycles' DIFFUSE colour pass, which scales colour by (1 − metallic), so bare metal bakes black. Until the helper changes, re-bake albedo as an EMIT bake of each source's Base Color input, into a fresh image (re-packing an already packed image keeps its old pixels). The helper bakes no emissive map either: add an EMIT bake with the same cage, with emission strength set to 1 on emissive source materials and 0 on the rest.
+- **Clean before unwrapping.** Bevels and Booleans leave zero-area slivers and needle triangles. MikkTSpace leaves needles without a tangent, so collapse their short edges, renormalize custom normals, and give the face normal to any corner still without a tangent. After smart projection, re-project and repack overlapping faces at a smaller angle limit, and fall back to lightmap islands for any that still overlap.
+- **LODs for conventional outputs.** Collapse decimation of thin glass slabs makes degenerate triangles: build glass LODs from the single-sided outer panes instead. A small interior of simple boxes keeps its topology at every level, with a clean lightmap atlas. Remove zero-area triangles after baking; they cover no texels.
+- **Strictly convex collision.** Convex hulls of render vertices inherit thousands of nearly coplanar facets and can fail convexity checks. Use support points along fixed directions (a k-DOP), snapped to a 10–20 mm grid, then limited dissolve and re-hull, and split each output into several hulls by region (front/rear, left/right, per pad).
+
 ## Deliver and inspect
 
 Read package reports and export round-trip evidence. Deliver the package ZIP plus editable sources. The viewer supports PBR, wireframe, LOD, collision, pivots/sockets and representation comparison. Unreal integration is editor-only and currently checks the 5.8 API; it uses versioned managed folders and protects artist-modified imports. Imported properties and saved assets are verified separately from rendered review/performance.

@@ -27,6 +27,16 @@ Textures use sRGB for base color/emissive and linear data for normals/roughness/
 
 Starter budgets are 20,000 triangles/output for conventional assets, 250,000 for Nanite, two used material slots and 2048-pixel maps. Conventional LOD targets are 1/.5/.25/.125. They are configurable production defaults, not universal engine limits. Failed budgets require asset revision or an explicit profile change.
 
+## Hero assets on Nanite
+
+A gated hero vehicle taken to the Nanite profile produced a set of practices. Its game runs never reached `passed`, so they are guidance, not validated delivery; the [skill's game reference](../geometryforge/skill/references/game-assets.md#hero-assets-on-nanite) has the details.
+
+- **Derive render meshes from the accepted design.** Evaluate it with panel subdivision at a lower game level instead of decimating, so bevels, seams and bolts stay real geometry. The full-level design stays in the scene as the bake source.
+- **Split outputs to fit the 250k budget.** Use several outputs by part group. Glass and interior are conventional outputs, because Nanite doesn't render translucency.
+- **Known limitation of `api.bake`.** Base colour is baked with Cycles' DIFFUSE colour pass, which scales by (1 − metallic), so bare metal comes out black. Re-bake albedo as an emission bake of the Base Color input. The helper doesn't bake emissive maps; add an emission bake with the same cage.
+- **Clean before unwrapping.** Collapse slivers and needle triangles, which leave MikkTSpace without tangents, and repack any faces that still overlap.
+- **Build conventional LODs and collision deliberately.** Glass LODs come from the single-sided outer panes rather than decimated slabs. Collision hulls are k-DOPs on a coarse grid, several per output, so they stay strictly convex.
+
 ## Unreal integration
 
 Enable PythonScriptPlugin and EditorScriptingUtilities in the selected `.uproject`. Discover Unreal with `doctor`, or set `GEOMETRYFORGE_UNREAL` to its installation/executable. Then:
