@@ -572,7 +572,7 @@ class Surfacing:
 
     def build_guide_mesh_stack(self, panel, guide, vgroup='guide_bound', thickness=3.0, bevel_width=0.6,
                                subsurf_levels=2, wrap_method='NEAREST_SURFACEPOINT', bevel_segments=2):
-        """SUBSURF -> SHRINKWRAP(master, vertex group) -> SOLIDIFY(inward) -> BEVEL(weight)."""
+        """SUBSURF -> SHRINKWRAP(master, vertex group) -> SOLIDIFY(inward) -> SHRINKWRAP(inner shell, INSIDE) -> BEVEL(weight)."""
         import bmesh
         bm = bmesh.new()
         bm.from_mesh(panel.data)
@@ -593,9 +593,13 @@ class Surfacing:
         solid.thickness, solid.offset, solid.use_even_offset, solid.use_rim = thickness, -1.0, False, True
         solid.use_quality_normals = True
         solid.shell_vertex_group, solid.rim_vertex_group = 'gf_inner', 'gf_solidify_rim'
+        # At a tight pocket corner or along a strip thinner than the shell, simple offset can carry inner-shell vertices
+        # out through the skin. An INSIDE shrinkwrap on the inner shell moves only those back onto the master.
+        guard = panel.modifiers.new('Shell guard', 'SHRINKWRAP')
+        guard.target, guard.wrap_method, guard.wrap_mode, guard.vertex_group = guide, 'NEAREST_SURFACEPOINT', 'INSIDE', 'gf_inner'
         bevel = panel.modifiers.new('Edge highlight', 'BEVEL')
         bevel.limit_method, bevel.offset_type, bevel.width, bevel.segments = 'WEIGHT', 'OFFSET', bevel_width, bevel_segments
-        return {'subsurf': sub, 'shrinkwrap': wrap, 'solidify': solid, 'bevel': bevel}
+        return {'subsurf': sub, 'shrinkwrap': wrap, 'solidify': solid, 'shell_guard': guard, 'bevel': bevel}
 
     # Pockets and interfaces -----------------------------------------------------------------
     def _guide(self, panel):

@@ -12,7 +12,7 @@ For compound curved reference geometry use [surface modeling](surface-modeling.m
 - Toolkit helpers are not part inputs: after changing one, rebuild with `run --parts ...` (or `--full`). A plain run, even with `--source code`, re-evaluates the saved scene when no project input changed.
 - `recessed_pocket_extrude(panel, loop, depth, draft_angle_deg, fillet_mm)`: weights `guide_bound` and `gf_pocket`, and stores the pull axis.
 - `open_well(panel, loop)`: for an opening that straddles panel lines, slice its own region, inset it, then open the interior as `loop`; `recessed_pocket_extrude(..., floor=True)` closes the well, `floor=False` leaves a seat.
-- `slice_panel(..., feature='door')`: extra keyword metadata is exported with the panel, so `detail` inventories can count panels.
+- `slice_panel(guide, ['nose', 'headlamp_r'], ...)`: a list slices the union of regions, for regions too thin to stand alone or a well across several regions. Extra keyword metadata (`feature='door'`) is exported with the panel, so `detail` inventories can count panels.
 - `extract_interface_ring(obj, loop, name)` and `local_ring(name, radius, z=0, axis=(0, 0, 1))`: edge-only `interface` role objects.
 - `ring_frame`, `bind_to_ring(child, ring, lap, interfaces)` and `project_detail(obj, parent)`.
 - `patch`, `loft`, `sweep` and `mesh_object`, plus `feature_curves(features.json)`.
