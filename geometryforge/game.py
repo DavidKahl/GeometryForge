@@ -41,7 +41,8 @@ def evidence_equivalent(left, right):
     if isinstance(left,list):
         return isinstance(right,list) and len(left)==len(right) and all(evidence_equivalent(a,b) for a,b in zip(left,right))
     if isinstance(left,float) and isinstance(right,(float,int)):
-        return bool(np.isclose(left,right,atol=1e-6,rtol=1e-7))
+        return left == right or (math.isfinite(left) and math.isfinite(right)
+                                 and abs(left - right) <= 1e-6 + 1e-7 * abs(right))
     return left==right
 
 

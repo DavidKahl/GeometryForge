@@ -330,17 +330,20 @@ class Surfacing:
         sub.use_creases = True
         return obj
 
-    def slice_panel(self, guide, region, openings=(), name=None, output_id=None, conform=True, **metadata):
+    def slice_panel(self, guide, region, openings=(), name=None, output_id=None, conform=True, topology=None, **metadata):
         """Copy one master region's cage faces (or the union of a list of regions) as a panel; opening borders get
         gf_loop_<opening> groups. A union joins regions too thin to stand alone, or a well across several regions.
 
         conform moves the copied cage onto the master's evaluated surface. A subdivision limit surface lies
         inside its control cage, so an unconformed panel cage would leave partly-weighted vertices proud.
         Extra metadata (e.g. feature='door' for detail inventories) is exported with the panel.
+        An optional topology cage supplies the regions and control faces, independently
+        of the evaluated guide's density. Both objects may have their own transforms.
         """
         import bmesh
         bpy = _bpy()
-        ids = json.loads(guide['gf_regions'])
+        source = topology if topology is not None else guide
+        ids = json.loads(source['gf_regions'])
         members = [region] if isinstance(region, str) else list(region)
         for key in (*members, *openings):
             if key not in ids:
@@ -348,7 +351,7 @@ class Surfacing:
         chosen = {ids[key] for key in members}
         label = '+'.join(members)
         bm = bmesh.new()
-        bm.from_mesh(guide.data)
+        bm.from_mesh(source.data)
         layer = bm.faces.layers.int.get('gf_region')
         bm.verts.ensure_lookup_table()
         loops = {}
@@ -370,14 +373,16 @@ class Surfacing:
         mesh.shade_smooth()
         obj = bpy.data.objects.new(name or f'{guide.name} {label}', mesh)  # checks select objects by this name
         bpy.context.scene.collection.objects.link(obj)
-        obj.matrix_world = guide.matrix_world.copy()
+        obj.matrix_world = source.matrix_world.copy()
         if conform:
             graph = bpy.context.evaluated_depsgraph_get()
+            to_guide = guide.matrix_world.inverted() @ obj.matrix_world
+            from_guide = to_guide.inverted()
             before = np.array([v.co for v in mesh.vertices], dtype=float)
             for vertex in mesh.vertices:
-                hit, location, _, _ = guide.closest_point_on_mesh(vertex.co, depsgraph=graph)
+                hit, location, _, _ = guide.closest_point_on_mesh(to_guide @ vertex.co, depsgraph=graph)
                 if hit:
-                    vertex.co = location
+                    vertex.co = from_guide @ location
             mesh.update()
             after = np.array([v.co for v in mesh.vertices], dtype=float)
             loops = {key: [tuple(after[int(np.linalg.norm(before - p, axis=1).argmin())]) for p in points] for key, points in loops.items()}
@@ -621,7 +626,8 @@ class Surfacing:
             result.append(np.array((rotation @ normal).normalized(), dtype=float))
         return np.asarray(result)
 
-    def recessed_pocket_extrude(self, panel, loop_id, depth, draft_angle_deg=4.0, fillet_mm=8.0, steps=3, floor=False):
+    def recessed_pocket_extrude(self, panel, loop_id, depth, draft_angle_deg=4.0, fillet_mm=8.0, steps=3, floor=False,
+                               planar_floor=False):
         """Extrude an opening border inward as a painted return: flush rim, filleted turn, drafted wall.
 
         guide_bound is 1 on the flush rim and 0 on every pocket ring: the rim locks to the master while the
@@ -629,6 +635,9 @@ class Surfacing:
         the return back onto the master and fold it). The floor ring becomes gf_loop_<loop_id>_floor.
         Rings are mitred offsets of the rim, so every rim edge moves inward by the full inset. Subdivision rounds
         sparse openings; build more cage resolution around an opening when its corners must stay tight.
+        planar_floor feathers a non-planar rim into a flat closed floor along
+        the pull axis, avoiding warped floor triangulation. It leaves the rim
+        and upper fillet unchanged; recheck draft after changing the floor.
         """
         import bmesh
         bpy = _bpy()
@@ -711,10 +720,14 @@ class Surfacing:
         bm.normal_update()
         original = [(f, f.normal.copy()) for f in bm.faces]
         previous = rim
+        rim_heights = points @ local_axis
+        floor_extra = rim_heights - rim_heights.min()
         for inset, down, weight in profile:
             ring = []
-            for v, n in zip(rim, inward):
-                created = bm.verts.new(tuple(np.asarray(v.co) + n * inset - local_axis * down))
+            falloff = max(0.0, (down - fillet_mm) / max(depth - fillet_mm, 1e-9)) if planar_floor and floor else 0.0
+            for i, (v, n) in enumerate(zip(rim, inward)):
+                extra = falloff * float(floor_extra[i])
+                created = bm.verts.new(tuple(np.asarray(v.co) + n * inset - local_axis * (down + extra)))
                 created[deform].clear()
                 created[deform][bound] = weight
                 created[deform][pocket] = 1.0
@@ -844,6 +857,103 @@ class Surfacing:
             obj.hide_render = True
             result.append(self.api.mark(obj))
         return result
+
+    # Procedural inflection, facet clustering, louver intakes & cable routing ---------------
+    def inflect_cage(self, verts, faces, **kwargs):
+        """Inflect a base cage `(verts, faces)` via symmetric metric Worley (F2 - F1),
+        cluster boundary sharpening, T-junction sub-slicing, and semantic region zoning."""
+        from .procedural_paneling import inflect_cage
+        return inflect_cage(verts, faces, **kwargs)
+
+    def inflected_master_hull(self, name, verts, faces, regions=None, use_cluster_regions=False,
+                              use_creases=False, levels=3, output_id=None, **inflect_kwargs):
+        """Build a Gate 1 master hull whose styling creases, taut facets, and semantic regions
+        are synthesized procedurally from a base cage `(verts, faces)`."""
+        if regions is not None:
+            inflect_kwargs.setdefault('base_regions', regions)
+        spec = self.inflect_cage(verts, faces, **inflect_kwargs)
+        chosen_regions = spec['regions'] if regions is not None or not use_cluster_regions else spec['cluster_regions']
+        creases = spec['creases'] if use_creases else None
+        obj = self.master_hull(name, spec['verts'], spec['faces'], regions=chosen_regions,
+                               creases=creases, levels=levels, output_id=output_id)
+        cluster_layer = obj.data.attributes.get('gf_cluster') or obj.data.attributes.new('gf_cluster', 'INT', 'FACE')
+        cluster_layer.data.foreach_set('value', [int(c) for c in spec['face_cluster']])
+        obj['gf_clusters'] = json.dumps({k: list(v) for k, v in spec['cluster_regions'].items()})
+        return obj
+
+    def louver_grille(self, name, seat_ring, count=5, depth_mm=14.0, thickness_mm=2.2,
+                      angle_deg=28.0, inset_mm=2.0, recess_mm=4.0, bevel=0.4,
+                      role='design', output_id=None, **metadata):
+        """Build an array of angled aerodynamic louver slats clipped to an interface ring contour."""
+        from .procedural_paneling import louver_slat_rings
+        metadata.setdefault('feature', 'louver')
+        world = np.array([seat_ring.matrix_world @ v.co for v in seat_ring.data.vertices], dtype=float)
+        edge = world[_cycle([e.vertices[:] for e in seat_ring.data.edges])]
+        _, axis, _ = self.ring_frame(seat_ring)
+        slats = louver_slat_rings(edge, axis, count=count, depth_mm=depth_mm, thickness_mm=thickness_mm,
+                                  angle_deg=angle_deg, inset_mm=inset_mm, recess_mm=recess_mm)
+        verts, faces = [], []
+        for ring0, ring1 in slats:
+            base = len(verts)
+            verts.extend(ring0)
+            verts.extend(ring1)
+            n = len(ring0)
+            faces.append(tuple(base + k for k in reversed(range(n))))
+            faces.append(tuple(base + n + k for k in range(n)))
+            for k in range(n):
+                faces.append((base + k, base + (k + 1) % n, base + n + (k + 1) % n, base + n + k))
+        obj = self._closed(self.mesh_object(name, verts, faces, role, smooth=False, output_id=output_id, **metadata))
+        return self._rounded(obj, bevel, segments=2)
+
+    def tangent_field(self, obj, guide_dir=(1.0, 0.0, 0.0), smooth_iters=8, singularity_threshold=0.35):
+        """Compute a curvature-guided orthogonal tangent field (`gf_tangent_u`, `gf_tangent_v`)
+        and singularity exclusion mask (`gf_nonsingular`) on `obj`."""
+        from .procedural_paneling import compute_tangent_field
+        matrix = np.asarray(obj.matrix_world)
+        local = np.array([v.co for v in obj.data.vertices], dtype=float)
+        world = (np.column_stack((local, np.ones(len(local)))) @ matrix.T)[:, :3]
+        faces = [list(p.vertices) for p in obj.data.polygons]
+        field = compute_tangent_field(world, faces, guide_dir=guide_dir,
+                                      smooth_iters=smooth_iters, singularity_threshold=singularity_threshold)
+        for attr, vecs in (('gf_tangent_u', field['tan_u']), ('gf_tangent_v', field['tan_v'])):
+            layer = obj.data.attributes.get(attr) or obj.data.attributes.new(attr, 'FLOAT_VECTOR', 'POINT')
+            layer.data.foreach_set('vector', vecs.astype(float).ravel().tolist())
+        mask_layer = obj.data.attributes.get('gf_nonsingular') or obj.data.attributes.new('gf_nonsingular', 'FLOAT', 'POINT')
+        mask_layer.data.foreach_set('value', field['nonsingular'].astype(float).tolist())
+        field['points'] = world
+        return field
+
+    def route_cables(self, name, guide, anchor_pairs, radius_mm=5.0, clearance_mm=1.5,
+                     valley_bias=0.5, detangle_iters=24, ribbed=False, rib=2.0, pitch=18.0,
+                     sides=14, role='design', output_id=None, **metadata):
+        """Route one or more collision-detangled cables across `guide` between `(start, end)` anchor pairs."""
+        from .procedural_paneling import route_detangled_paths
+        bpy = _bpy()
+        metadata.setdefault('feature', 'cable')
+        graph = bpy.context.evaluated_depsgraph_get()
+        evaluated = guide.evaluated_get(graph)
+        mesh = evaluated.to_mesh(preserve_all_data_layers=False, depsgraph=graph)
+        try:
+            matrix = np.asarray(guide.matrix_world)
+            local = np.array([v.co for v in mesh.vertices], dtype=float)
+            verts = (np.column_stack((local, np.ones(len(local)))) @ matrix.T)[:, :3]
+            faces = [list(p.vertices) for p in mesh.polygons]
+        finally:
+            evaluated.to_mesh_clear()
+        paths = route_detangled_paths(verts, faces, anchor_pairs, radius_mm=radius_mm,
+                                      clearance_mm=clearance_mm, valley_bias=valley_bias,
+                                      detangle_iters=detangle_iters)
+        objs = []
+        for idx, path in enumerate(paths):
+            part_name = name if len(paths) == 1 else f'{name} {idx + 1}'
+            if ribbed:
+                c_obj = self.ribbed_tube(part_name, path, radius_mm, rib=rib, pitch=pitch,
+                                         sides=sides, role=role, output_id=output_id, **metadata)
+            else:
+                c_obj = self.sweep(part_name, path, radius_mm, sides=sides,
+                                   role=role, output_id=output_id, **metadata)
+            objs.append(c_obj)
+        return objs[0] if len(objs) == 1 else objs
 
 
 def _near(points, tolerance=1e-3):

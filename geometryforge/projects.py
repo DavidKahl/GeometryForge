@@ -1,5 +1,6 @@
 """Versioned standalone project and dependency contracts."""
 from pathlib import Path
+import os
 import re
 import shutil
 import tomllib
@@ -12,6 +13,35 @@ ID = re.compile(r"^[a-z][a-z0-9_]*$")
 
 CHECK_KINDS = ("seam", "recess", "mating", "global", "detail")
 SURFACE_CHECKS = PACKAGE / "surface_checks.py"
+
+def projects_root():
+    """Where new projects are created: GEOMETRYFORGE_PROJECTS, then the user config, then GF_Projects
+    beside a source checkout (or in the home folder for a wheel install). Projects keep working anywhere."""
+    configured = os.environ.get("GEOMETRYFORGE_PROJECTS") or read(HOME / "config.json", {}).get("projects_root")
+    if configured:
+        return Path(configured).expanduser().resolve()
+    return (ROOT.parent if (ROOT / "pyproject.toml").is_file() else Path.home()) / "GF_Projects"
+
+def set_projects_root(path):
+    root = Path(path).expanduser().resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    with exclusive(HOME):
+        config = read(HOME / "config.json", {})
+        config["projects_root"] = str(root)
+        write(HOME / "config.json", config)
+    return {"projects_root": str(root), "exists": True}
+
+def bare(name):
+    """A plain folder name (no separators, not '.' or '..') means a project in the projects root."""
+    text = str(name)
+    return bool(text) and text not in (".", "..") and not Path(text).is_absolute() and not re.search(r"[\\/:]", text)
+
+def resolve(root):
+    """Project folder for a CLI argument: an existing path as given, else a bare name in the projects root."""
+    path = Path(root)
+    if not path.exists() and bare(root) and (projects_root() / root).exists():
+        path = projects_root() / root
+    return path.resolve()
 
 def checker(root, check):
     """Typed checks run the packaged surface checker; others run a project file."""
@@ -48,7 +78,7 @@ def validate_check(root, name, check, parts, version, params):
             raise ValueError(f"Missing checker source {path}")
 
 def load(root):
-    root = Path(root).resolve()
+    root = resolve(root)
     config = tomllib.loads((root / "project.toml").read_text(encoding="utf-8"))
     if config.get("format_version") not in (1, 2, 3):
         raise ValueError("Unsupported GeometryForge project format")
@@ -136,7 +166,7 @@ def part_inputs(project, name):
             "parameters": {p: project["parameters"][p] for p in spec.get("parameters", [])}, "spec": spec}
 
 def initialize(destination, example=None, ident=None, deliverables="both", backend="blender", brief="", bed=(220,220,250), target=None):
-    destination = Path(destination).resolve()
+    destination = (projects_root() / destination if bare(destination) else Path(destination)).resolve()
     if destination.exists() and any(destination.iterdir()):
         raise ValueError("Initialize into an empty directory")
     ident = ident or destination.name.lower().replace("-", "_").replace(" ", "_")
@@ -176,7 +206,7 @@ def initialize(destination, example=None, ident=None, deliverables="both", backe
 
 def unregister(root):
     """Remove a project from the viewer catalog; its folder and runs are left untouched."""
-    key = fingerprint(str(Path(root).resolve()))[:16]
+    key = fingerprint(str(resolve(root)))[:16]
     with exclusive(HOME):
         items = registry()
         removed = items.pop(key, None)

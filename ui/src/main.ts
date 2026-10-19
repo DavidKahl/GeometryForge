@@ -34,7 +34,7 @@ document.querySelector('#app')!.innerHTML=`
 <section class="card renders-card"><h2>Renders <span id="renders-note" class="muted"></span></h2><div id="renders" class="renders"></div></section>
 <section class="evidence"><div class="card"><h2>Validation evidence</h2><div id="checks">No run selected.</div><pre id="errors"></pre></div><div class="card"><h2>Files &amp; logs <span id="files-note" class="muted"></span></h2><div id="artifacts"></div></div></section>
 </main>
-<dialog id="dialog"><form id="project-form"><h2>Add a project</h2><label>Project folder<input id="folder" required placeholder="E:\\Models\\My project"></label><label><input type="checkbox" id="create"> Create an empty project in this folder</label><p>Modeling and generation stay in your agent.</p><div class="actions"><button type="button" id="cancel">Cancel</button><button type="submit" class="primary">Add project</button></div></form></dialog><div id="toast" role="status"></div>`;
+<dialog id="dialog"><form id="project-form"><h2>Add a project</h2><label>Project folder or name<input id="folder" required placeholder="my_project"></label><label><input type="checkbox" id="create"> Create an empty project in this folder</label><p id="root-hint"></p><p>Modeling and generation stay in your agent.</p><div class="actions"><button type="button" id="cancel">Cancel</button><button type="submit" class="primary">Add project</button></div></form></dialog><div id="toast" role="status"></div>`;
 
 const $=(id:string)=>document.getElementById(id)!;
 const viewer=new Viewer($('viewport'));
@@ -379,7 +379,7 @@ $('copy').onclick=guarded(async()=>{if(!session.key)return;const parts=state.iso
   await navigator.clipboard.writeText(`GeometryForge project: ${projects[session.key].path}\nRun: ${runA?.id||'none'}${parts.length?`\nParts: ${parts.join(', ')}`:''}\nStart with: geometryforge context "${projects[session.key].path}"`);toast('Agent reference copied')});
 $('rename').onclick=guarded(async()=>{if(!session.key)return;const title=prompt('Project display name',projects[session.key].title);if(title){await api(`/projects/${session.key}`,'PATCH',{title});await refreshProjects();$('title').textContent=title}});
 $('archive').onclick=guarded(async()=>{if(!session.key)return;await api(`/projects/${session.key}`,'PATCH',{archived:!projects[session.key].archived});await refreshProjects()});
-$('show-archived').onchange=guarded(refreshProjects);$('add').onclick=()=>($('dialog') as HTMLDialogElement).showModal();$('cancel').onclick=()=>($('dialog') as HTMLDialogElement).close();
+$('show-archived').onchange=guarded(refreshProjects);$('add').onclick=guarded(async()=>{const {projects_root}=await api('/settings');$('root-hint').textContent=`A name alone creates or finds the project in ${projects_root}.`;($('dialog') as HTMLDialogElement).showModal()});$('cancel').onclick=()=>($('dialog') as HTMLDialogElement).close();
 $('project-form').onsubmit=e=>{e.preventDefault();void(async()=>{const item=await api('/projects','POST',{path:($('folder') as HTMLInputElement).value,create:($('create') as HTMLInputElement).checked});($('dialog') as HTMLDialogElement).close();await refreshProjects();await openProject(item.key)})().catch(e=>toast(String(e)))};
 void(async()=>{await startSession();await refreshProjects();const first=Object.keys(projects).find(k=>!projects[k].archived);if(first)await openProject(first)})().catch(e=>toast(String(e)));
 setInterval(()=>void refresh().catch(e=>toast(String(e))),5000);

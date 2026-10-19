@@ -6,6 +6,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- **Projects folder:** new projects live outside the GeometryForge checkout. `geometryforge init NAME` creates the project in the projects folder, and every command accepts that bare name in place of a path. The folder resolves from `GEOMETRYFORGE_PROJECTS`, then `projects_root` in `~/.geometryforge/config.json` (`geometryforge config projects-root DIR`, `install-skill --projects-root DIR`), then `GF_Projects` beside the checkout (`~/GF_Projects` for a wheel install). An explicit path still places one project anywhere. `doctor` and the viewer (`GET /api/settings`, the Add project dialog) show the folder.
 - **Viewer References tab:** the clean views and other reference images of a project, with their calibration RMS. Clicking a calibrated view looks along its camera (a near-orthographic narrow lens from 300 m) and lays the reference over the model with adjustable opacity; orbiting returns to the normal view with the same framing. `GET /api/projects/{key}/references`; the artifact route also serves image files under `references/`.
 - **Orthographic calibration:** cameras with `"projection": "orthographic"` and a `"view"` (front, back, left, right, top, bottom) are solved by a linear similarity fit of scale, offset and roll from three or more datums. Silhouette scores, overlays and `camera.ref` review views work for every clean view.
 - **Detail checks (`kind = "detail"`):** an accepted inventory of `{id, feature, min_count}` items, with optional `region_mm`, `relief_mm` and `density_min_per_m2`. Each separate mesh island of objects tagged with the feature counts once, and must sit within `seat_mm` (default 1.0) of the parent skin. The final geometry gate must declare a detail check before `gate check` is ready, so detail can no longer drop out while every surface check passes.
@@ -16,12 +17,17 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Documentation
 
+- **Projects moved out of the repository:** `projects/` keeps only the Astraeus Heavy Lander showcase. The gated hover taxi showcase and the local study projects now live in the projects folder and are no longer part of the repository.
 - **Hero assets on Nanite:** game-asset guidance in the skill and `docs/GAME_ASSETS.md`. It covers render meshes derived from the retained design at a lower subdivision level, outputs split to the triangle budget, mesh clean-up before unwrapping, glass and interior LODs, and strictly convex k-DOP collision.
 - **Known limitation:** `api.bake` bakes base colour with Cycles' DIFFUSE colour pass, which scales by (1 − metallic), so bare metal bakes black. It doesn't bake emissive maps. Both workarounds are documented.
 - README and user guide cover clean reference sets, `references masks|check`, orthographic calibration, detail checks, detail primitives, `open_well`, and the viewer's References tab and Guides toggle.
 
 ### Fixed
 
+- **Procedural seam protection:** authored region borders can act as clustering barriers with an unchanged subdivision collar (`preserve_region_boundaries`, `boundary_collar_rings`). Structural macro creases are now pinned before displacement; later tangential fairing respects zero vertex weights.
+- **Panel topology and pocket floors:** `slice_panel(..., topology=...)` can use an authored control cage independently of the evaluated guide, including differently transformed objects. `inflected_master_hull` propagates authored regions through cage refinement. Closed pockets can feather non-planar rims into a planar floor with `planar_floor=True`.
+- **Native evidence comparison:** scalar float comparisons use the same absolute/relative tolerance without dispatching NumPy once per value. Large save/reopen and cached-evidence comparisons retain exact topology comparisons and the prior NaN/infinity behavior.
+- **Dense opening coverage:** points outside an opening's plane band or polygon bounds are pruned before the polygon loop, retaining the existing coverage predicate while reducing work on dense interface rings.
 - **Viewer loads large design parts:** parts now load as compact binary meshes (`GET /api/projects/{key}/mesh`, `geometryforge/viewer_mesh.py`), converted once per evidence file and cached under `.geometryforge/cache/viewer/`. Detailed design evidence reached 572 MB of JSON per part, which browsers could not fetch and parse; a detailed gated project's 1.75 GB of part JSON is 214 MB as binary and loads in about 4 s.
 - **Shell guard:** at a tight pocket corner, or along a strip thinner than the panel, Solidify's simple offset could carry inner-shell vertices out through the skin. `build_guide_mesh_stack` now adds an INSIDE shrinkwrap on the inner shell after Solidify, so only such vertices move back onto the master.
 

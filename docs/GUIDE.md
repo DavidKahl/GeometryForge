@@ -17,6 +17,8 @@ Most of the time you won't type these commands yourself. Your agent runs them th
 
 ## Working with your agent
 
+For a faceted industrial hull, request the procedural paneling workflow with your concept references. Establish the macro cage and functional regions first. On a hull with authored panel seams, use `inflect_cage(base_regions=regions, preserve_region_boundaries=True, boundary_collar_rings=2)` to protect seam stencils while shaping the panel interiors. Review the resulting facets and measure seams before accepting the revised master; see the [paneling reference](../geometryforge/skill/references/procedural-paneling.md).
+
 After `geometryforge install-skill`, ask your agent to "use GeometryForge" for a modeling task. The skill makes it:
 
 1. Run `geometryforge context` to read the current state of an existing project.
@@ -28,6 +30,8 @@ After `geometryforge install-skill`, ask your agent to "use GeometryForge" for a
 A good request names the object, its size or purpose, your printer and nozzle, the material, and which applications you use. Ask for a fit coupon whenever parts have to mate.
 
 ## Project layout
+
+A project is a standalone folder, by default inside the [projects folder](#projects-folder):
 
 ```text
 my_project/
@@ -109,9 +113,10 @@ All commands print JSON. Exit code `0` means success, `2` a failed, cancelled or
 
 | Command | What it does |
 |---|---|
-| `geometryforge doctor` | Shows the Blender, Houdini and Bambu Studio executables that will be used |
-| `geometryforge install-skill [--target DIR \| --user] [--harness claude\|codex\|both]` | Installs the agent skill |
-| `geometryforge init DIR [--example desk_organizer] [--deliverables …] [--bed X Y Z] [--brief …]` | Creates a project and registers it with the viewer |
+| `geometryforge doctor` | Shows the Blender, Houdini and Bambu Studio executables that will be used, and the projects folder |
+| `geometryforge install-skill [--target DIR \| --user] [--harness claude\|codex\|both] [--projects-root DIR]` | Installs the agent skill and creates the projects folder |
+| `geometryforge config projects-root [DIR]` | Shows or changes the projects folder |
+| `geometryforge init NAME\|DIR [--example desk_organizer] [--deliverables …] [--bed X Y Z] [--brief …]` | Creates a project (a bare name goes into the projects folder) and registers it with the viewer |
 | `geometryforge context [DIR]` | Decisions, parameters, safe point, open issues, and whether working scenes changed. Start here. |
 | `geometryforge plan [DIR] [--parts …] [--backend …]` | Which parts would be rebuilt and from which source, without running anything |
 | `geometryforge run [DIR] [--parts …] [--backend …] [--full] [--source auto\|scene\|code]` | Builds, exports, checks and records a run |
@@ -235,6 +240,13 @@ def verify(payload):
 | `GEOMETRYFORGE_HOUDINI` | Houdini executable or installation folder |
 | `GEOMETRYFORGE_BAMBU` | Bambu Studio executable (optional) |
 | `GEOMETRYFORGE_HOME` | Where the viewer's project catalog and the Houdini session state live (default `~/.geometryforge`) |
+| `GEOMETRYFORGE_PROJECTS` | Projects folder for `init NAME`; overrides `geometryforge config projects-root` |
+
+### Projects folder
+
+New projects live outside the GeometryForge checkout, so the repository only holds what ships. `geometryforge init taxi` creates `taxi` in the projects folder, and every command accepts that bare name in place of a path (`geometryforge context taxi`).
+
+The default is a `GF_Projects` folder beside the checkout (`~/GF_Projects` for a wheel install). Change it with `geometryforge config projects-root DIR` or `install-skill --projects-root DIR`, or set `GEOMETRYFORGE_PROJECTS` for one shell. A single project can still live anywhere: pass an explicit path to `init` or `register`. `doctor` reports the folder in use.
 
 ## Gated hard-surface workflow
 
@@ -250,14 +262,14 @@ Curved multi-panel assets such as vehicles, housings and armour go wrong in two 
 Only accepted gates and the active gate can be built; later parts are dormant, and `run --parts` on them is refused. Accepting a gate records its evidence under `.geometryforge/gates/` and locks its geometry. A run that changes locked geometry becomes a candidate. `gate reopen` releases it and supersedes later gates. Game and print routes wait until the final gate is accepted.
 
 ```powershell
-geometryforge migrate projects/taxi --format 3
+geometryforge migrate taxi --format 3
 geometryforge gate template            # prints a [gates.*] starting point
-geometryforge calibrate projects/taxi  # after recording correspondences.json
-geometryforge gate check projects/taxi calibration
-geometryforge gate accept projects/taxi calibration --by Dave --note "Dave: overlay matches, go"
-geometryforge run projects/taxi --target design
-geometryforge review projects/taxi --scene … --config projects/taxi/reviews/master.json --blind
-geometryforge gate check projects/taxi master
+geometryforge calibrate taxi  # after recording correspondences.json
+geometryforge gate check taxi calibration
+geometryforge gate accept taxi calibration --by Dave --note "Dave: overlay matches, go"
+geometryforge run taxi --target design
+geometryforge review taxi --scene … --config GF_Projects/taxi/reviews/master.json --blind
+geometryforge gate check taxi master
 ```
 
 `gate accept` requires `--by` and a `--note` quoting the approval. The agent must only run it after you have approved the evidence; the toolkit can verify the evidence, not who approved it.
@@ -303,7 +315,7 @@ For close-up reference assets, establish proportions and compound curvature befo
 Render a saved scene without rebuilding, saving or adopting it:
 
 ```powershell
-geometryforge review projects/my_asset --scene projects/my_asset/working/model.blend --config projects/my_asset/review-views.json
+geometryforge review my_asset --scene GF_Projects/my_asset/working/model.blend --config GF_Projects/my_asset/review-views.json
 ```
 
 Set `GEOMETRYFORGE_BLENDER` or pass `--blender <executable>`. The `--timeout` default is 900 seconds for the whole subprocess. Scene/config CLI paths are relative to the calling directory; reference paths are relative to the project and must remain inside it. Review outputs are written to a new `review/<timestamp-id>/` folder; existing evidence is retained. The command never runs project recipes, modifies a source scene or promotes a safe point.

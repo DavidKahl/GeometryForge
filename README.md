@@ -26,6 +26,7 @@ How GeometryForge came to be, from hand-modeled chess pieces to agent-built, val
 - **A local viewer.** Browse projects and runs, isolate parts, compare any two runs side by side or as an overlay, view renders and download files.
 - **Reference geometry review.** Render saved Blender scenes as clay, glossy, silhouette, wireframe and zebra comparisons from repeatable or calibrated cameras, including section cuts, a 21-view survey and region-invariance diffs. Retain hashed evidence without changing native scenes or safe points; see [the review guide](docs/GUIDE.md#reference-and-geometry-review).
 - **Gated hard-surface workflow.** Format 3 projects build curved hulls top-down: calibrated reference, one locked master hull, panels shrinkwrapped to it, then detail bound to interface rings. Typed checks measure seams, pockets and joints instead of mere contact. Clean six-view orthographic references calibrate every view, and detail checks count the real detail geometry against an accepted inventory, so detail can't quietly drop out; see [the gated workflow](docs/GUIDE.md#gated-hard-surface-workflow).
+- **Procedural panel inflection.** Generate faceted hulls from an editable cage with neutral `api.surf` helpers. Authored region borders can retain a protected collar so panel seams stay in place while interior facets vary; see [procedural paneling](geometryforge/skill/references/procedural-paneling.md).
 - **No AI service of its own.** GeometryForge has no API keys, model provider or chat. Your existing agent does the thinking; GeometryForge does deterministic execution and bookkeeping.
 
 ## Requirements
@@ -67,27 +68,29 @@ To use GeometryForge from another Python environment, install the checkout as a 
 The skill teaches your agent the workflow: establish the brief and printer, model each part natively, plan, run, read the evidence and report honestly.
 
 ```powershell
-uv run geometryforge install-skill --target C:/Models/MyWorkspace   # one workspace
+uv run geometryforge install-skill --target ../GF_Projects            # one workspace
 uv run geometryforge install-skill --user                           # all your projects
 ```
 
-This writes `.claude/skills/geometryforge` and `.agents/skills/geometryforge` (for Codex). Existing `CLAUDE.md`/`AGENTS.md` files are left alone, and locally modified skill files are never overwritten. Restart your agent if the skill doesn't show up.
+This writes `.claude/skills/geometryforge` and `.agents/skills/geometryforge` (for Codex), and creates the projects folder: `GF_Projects` beside this checkout, or the folder you pass with `--projects-root`. Existing `CLAUDE.md`/`AGENTS.md` files are left alone, and locally modified skill files are never overwritten. Restart your agent if the skill doesn't show up.
 
 ## Your first project
+
+Projects live outside this repository, in the projects folder (`geometryforge config projects-root` shows or changes it). A bare name like `housing` creates and finds the project there; an explicit path puts a single project anywhere.
 
 For a game asset with an optional printable version:
 
 ```powershell
-uv run geometryforge init C:/Models/Housing --example mechanical_prop --target game --deliverables blender
-uv run geometryforge plan C:/Models/Housing
-uv run geometryforge run C:/Models/Housing
+uv run geometryforge init housing --example mechanical_prop --target game --deliverables blender
+uv run geometryforge plan housing
+uv run geometryforge run housing
 uv run geometryforge viewer
 ```
 
 This creates editable detailed construction, a conventional game mesh with UVs, baked PBR maps, LODs, convex collision, a socket, FBX exports and GLB previews. Use `--profile unreal_desktop_nanite` for the Nanite representation. To derive a print version, use the game safe-point ID reported by `context`:
 
 ```powershell
-uv run geometryforge derive C:/Models/Housing --target print --from-run <game-run-id> --from-target game --scale 1.25
+uv run geometryforge derive housing --target print --from-run <game-run-id> --from-target game --scale 1.25
 ```
 
 Output routes and native applications are independent: `--target both` means game + print; `--deliverables both` still means Blender + Houdini. Existing v1 print projects continue to work; `migrate --format 2` creates backups before enabling target contracts. [Game workflow and project authoring](docs/GAME_ASSETS.md).
@@ -95,9 +98,9 @@ Output routes and native applications are independent: `--target both` means gam
 For the existing print workflow:
 
 ```powershell
-uv run geometryforge init C:/Models/Organizer --example desk_organizer --deliverables both
-uv run geometryforge plan C:/Models/Organizer
-uv run geometryforge run C:/Models/Organizer
+uv run geometryforge init organizer --example desk_organizer --deliverables both
+uv run geometryforge plan organizer
+uv run geometryforge run organizer
 uv run geometryforge viewer
 ```
 
@@ -116,15 +119,6 @@ The agent asks only for decisions that change the design, writes the brief, dime
 [`projects/astraeus_lander`](projects/astraeus_lander) is a 480 mm, 22-part display model of a fictional heavy lander, built entirely by an agent with GeometryForge from a single concept sheet. It has native Blender and Houdini versions, eight interface checks and a four-colour filament plan for a Bambu Lab X2D. See its [README](projects/astraeus_lander/README.md) and [print and assembly guide](projects/astraeus_lander/PRINT_AND_ASSEMBLE.md).
 
 The printable files (STL, 3MF, the Bambu print kit and the native scenes) are attached to the [GitHub release](https://github.com/DavidKahl/GeometryForge/releases), so you can print it without Blender or Houdini.
-
-## Showcase: gated hover taxi
-
-[`projects/hover_taxi_gated`](projects/hover_taxi_gated) is a 5.8 m cyberpunk hover taxi built top-down through the format 3 gates:
-- a calibrated master hull;
-- panels sliced from it, with recessed pockets;
-- mechanical detail bound to the pockets' interface rings: pads, nacelle drive, glass and roof equipment.
-
-Each gate was accepted after a blind review and measured seam, pocket, mating and silhouette checks. Its [README](projects/hover_taxi_gated/README.md) compares it with two earlier ungated builds from the same cameras: it is ahead on surfacing and attachment, and behind on small detail.
 
 ## How it works
 

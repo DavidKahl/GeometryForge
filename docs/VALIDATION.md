@@ -2,6 +2,19 @@
 
 What has actually been verified, on what, and when. Nothing here claims a physical print. Native validation has only been done on Windows.
 
+## Procedural panel seam recovery (18 October 2026)
+
+The local procedural hover-taxi study exposed seam drift through unprotected region borders, insufficient master tessellation for short curvature probes, warped closed vent floors, and excessive scalar overhead during native evidence comparison.
+
+- Host suite: `uv run python -m pytest -q` — **185 passed, 4 skipped**. The warning is an existing Starlette/httpx deprecation. The procedural host tests also collect through the `uv run pytest` entry point.
+- Procedural paneling suite: **8 passed** (seven host tests and one native integration in Blender 5.2.1 LTS). The native scene was saved and reopened and checked for master closure and a measured panel seam, transformed independent topology, a planar pocket floor, louvers, tangent fields and cable routing. Host regressions verify unchanged boundary collars, separated clusters and macro creases pinned before displacement.
+- Float-equivalence regressions compare the scalar tolerance with NumPy at tolerance boundaries, NaN/infinity cases, and changed integer topology. A local 300,000-scalar comparison completed in 0.18 s; this is an evidence-comparison measurement, not a whole-model build benchmark.
+- Opening coverage rejects points outside the existing plane band and polygon bounds before iterating dense rings. Differential tests on concave openings, including a transformed ring, match the previous full polygon predicate; the complete surface-check suite passed 31 tests.
+- The revised master has a retained 26-view clay/zebra/silhouette/overlay review. Its artistic limitations (roof and nacelle highlight unevenness and reduced faceting around protected seams) are recorded in the local critique. A technical pass does not establish visual acceptance.
+- The final panel preflight passed **25/25** unchanged checks: 14 seams, eight recesses, two coverage checks and one detail inventory. Maximum measured seam step was 0.0056 mm and master deviation 0.000242 mm. Body coverage had zero uncovered samples at the existing 14 mm tolerance (largest measured distance 10.97 mm); nacelles were within 3.02 mm at their existing 9 mm tolerance. The revised master is a passed design safe point and `gate check master` is ready. Visual approval and formal acceptance remain pending; the panel preflight does not constitute Gate 2 acceptance.
+
+The project remains outside the checkout in the configured projects folder. This work does not establish a finished game package, Unreal verification, Houdini parity, or print readiness.
+
 ## Gated advanced hover taxi (16-17 October 2026, branch `clean-references-detail`)
 
 A second real-project run of the four gates in Blender 5.2.1 LTS (a local project that isn't published in this repository; design route only), from a clean six-view orthographic reference set and with detail measured by checks. Gates 0 and 1 were accepted by the user. Gates 2 and 3 were accepted under the user's explicit delegation while they were away, with every threshold recorded as set on their behalf for later review. Native runs, in order:
@@ -38,7 +51,7 @@ Not run: Houdini; a physical reference (the clean views are generated images).
 
 ## Gated hover taxi rebuild (16 October 2026, branch `hover-taxi-gated`)
 
-A real-project run of the format 3 gates in Blender 5.2.1 LTS ([`projects/hover_taxi_gated`](../projects/hover_taxi_gated/README.md), design route only). Every gate was accepted by the user after its blind review. Native runs, in order:
+A real-project run of the format 3 gates in Blender 5.2.1 LTS (`hover_taxi_gated`, design route only; the project has since moved out of the repository into the local projects folder). Every gate was accepted by the user after its blind review. Native runs, in order:
 
 - **Gate 0 calibration:** `geometryforge calibrate` on the primary and profile references. The primary solved at 10.9 px RMS from seven datums; the user set a 12 px limit, recorded with its reason. The nose and headlamp corners were dropped as datums because they are different 3D points in the two generated views.
 - **Gate 1 master hull:** a closed body cage and two nacelle masters, 0 open edges. Silhouette IoU is 0.830 (primary) and 0.817 (profile) against a user limit of 0.80 for the master alone. Gate 1 was later reopened by the user to move the nacelle sockets to the rear face, and re-accepted.
@@ -107,7 +120,7 @@ This is a first full-exterior study with visual refinements listed in its README
 - **Blender 5.2.1 LTS**, on Windows, created and reopened a dedicated temporary managed subdivision-panel fixture. Clay, glossy, silhouette and wireframe renders were nonblank, respected the requested resolution and evaluated the saved render modifier levels. Construction operands were excluded; unknown/non-renderable selections failed. Native collection and Geometry Nodes instances rendered with evaluated transforms. Source scene hashes and the fixture safe-point record stayed unchanged. Fixed studio placement was checked.
 - **7 Chromium tests passed** on the self-contained port-8744 fixtures after `npm ci --prefix ui` and the viewer production build. The rebuilt `geometryforge/web_dist` is byte-identical to the tracked bundle, so there is no bundle change to commit.
 - **Wheel and source distribution built.** The wheel contains both review modules, the new canonical surface-modeling reference and the prebuilt viewer. The canonical skill was refreshed into both repository harness installations.
-- **Isolated hover taxi study** built and reopened editable compound-curved front surfaces, one segmented front-right pad and one right rear engine. Review evidence includes all four modes, isolated/mounted views and before/after comparisons with identical cameras, resolutions and explicit studio light placement. Original taxi design/game snapshots and project-state SHA-256 values remained unchanged. See the local [study delivery](../projects/hover_taxi_geometry_study/README.md) and its `delivery.json` for geometry counts, hashes, retained reports and remaining visual mismatches.
+- **Isolated hover taxi study** built and reopened editable compound-curved front surfaces, one segmented front-right pad and one right rear engine. Review evidence includes all four modes, isolated/mounted views and before/after comparisons with identical cameras, resolutions and explicit studio light placement. Original taxi design/game snapshots and project-state SHA-256 values remained unchanged. See the local study delivery (`hover_taxi_geometry_study/README.md` in the projects folder) and its `delivery.json` for geometry counts, hashes, retained reports and remaining visual mismatches.
 - **Original-detail audit** ray-sampled four +Y door/fender seams at three heights in copied retained design/game scenes. Door groove centers survived; their edge sidewalls became sloped over roughly 1 mm. The largest ray-hit difference at a groove edge was about 46.44 mm, not a measured vertex displacement or proof of complete groove removal. The audit does not cover the whole asset.
 
 The study remains a candidate with visual acceptance pending. No new game package, Unreal import, Houdini optimization, slicer review or physical print test was performed for this change. The images demonstrate geometry and review tooling, not an exact reconstruction of the photographic or generated references.

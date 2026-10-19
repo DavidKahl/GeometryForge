@@ -44,4 +44,8 @@ def doctor():
     result['game_pipeline'] = {'blender': 'FBX, attribute-preserving GLB, Cycles baking',
                                'houdini': 'Native SOP attributes; game exports require a supported license',
                                'profiles': ['unreal_desktop_standard', 'unreal_desktop_nanite']}
+    from .projects import projects_root
+    root = projects_root()
+    result['projects_root'] = {'path': str(root), 'exists': root.is_dir(),
+                               'change': 'geometryforge config projects-root PATH, or GEOMETRYFORGE_PROJECTS'}
     return result

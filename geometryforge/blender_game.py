@@ -1,18 +1,21 @@
 """Editable Blender game preparation, attribute extraction and native FBX exports."""
 import json
+import math
 from pathlib import Path
 
 
 def equivalent(left, right):
     """Native float32 recooking may round attributes; topology and identities stay exact."""
-    import numpy as np
     if isinstance(left, dict):
         return isinstance(right, dict) and left.keys() == right.keys() and all(equivalent(left[k], right[k]) for k in left)
     if isinstance(left, list):
         if not isinstance(right, list) or len(left) != len(right): return False
         return all(equivalent(a,b) for a,b in zip(left,right))
     if isinstance(left, float) and isinstance(right,(float,int)):
-        return bool(np.isclose(left,right,atol=1e-6,rtol=1e-7))
+        # Match numpy.isclose's asymmetric tolerance without a numpy dispatch
+        # for every scalar in a multi-million-corner native evidence payload.
+        return left == right or (math.isfinite(left) and math.isfinite(right)
+                                 and abs(left - right) <= 1e-6 + 1e-7 * abs(right))
     return left == right
 
 

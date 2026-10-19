@@ -294,6 +294,33 @@ def test_open_edges_global():
     assert not holed['passed']
 
 
+@pytest.mark.parametrize('rotated', [False, True])
+def test_opening_bounds_pruning_matches_full_polygon_predicate(rotated):
+    from geometryforge.game import world_vertices
+    opening = ring_obj('concave', 'panel', [0, 0, 0], n=6)
+    opening['vertices'] = [[-20, -20, 0], [20, -20, 0], [20, 0, 0],
+                           [0, 0, 0], [0, 20, 0], [-20, 20, 0]]
+    transform = trimesh.transformations.rotation_matrix(.7, [1, 2, 3]) if rotated else np.eye(4)
+    transform[:3, 3] = [120, -80, 40]
+    opening['matrix_world'] = transform.tolist()
+    points = trimesh.transform_points(np.random.default_rng(42).uniform(-100, 100, (5000, 3)), transform)
+    centre, axis, radius, _ = surface_checks.ring([opening])
+    vertices = world_vertices(opening)
+    u = np.cross(axis, [1, 0, 0] if abs(axis[0]) < .9 else [0, 1, 0])
+    u /= np.linalg.norm(u)
+    w = np.cross(axis, u)
+    polygon = np.column_stack(((vertices - centre) @ u, (vertices - centre) @ w))
+    offset = points - centre
+    sx, sy = offset @ u, offset @ w
+    expected = np.zeros(len(points), dtype=bool)
+    for (x1, y1), (x2, y2) in zip(polygon, np.roll(polygon, -1, axis=0)):
+        with np.errstate(divide='ignore', invalid='ignore'):
+            expected ^= ((y1 > sy) != (y2 > sy)) & (sx < (x2 - x1) * (sy - y1) / (y2 - y1) + x1)
+    expected &= np.abs(offset @ axis) < radius
+    np.testing.assert_array_equal(surface_checks.inside_opening(points, opening), expected)
+    assert expected.any() and not expected.all()
+
+
 def test_coverage_finds_uncovered_master_and_respects_openings():
     MV, MF = grid(sphere(), (-.5, .5), (-.3, .3), 201, 61)
     AV, AF = grid(sphere(), (-.5, -.06), (-.3, .3), 100, 61)

@@ -2,7 +2,7 @@
 from pathlib import Path
 import secrets
 from urllib.parse import urlparse
-from .projects import PACKAGE, registry, register, initialize, load
+from .projects import PACKAGE, registry, register, initialize, load, projects_root
 from .engine import context
 from .storage import read, inside
 
@@ -42,6 +42,10 @@ def create_app():
     @app.get('/api/projects')
     def projects():
         return registry()
+
+    @app.get('/api/settings')
+    def settings():
+        return {'projects_root':str(projects_root())}
 
     @app.post('/api/projects')
     async def add(request: Request):

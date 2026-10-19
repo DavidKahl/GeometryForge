@@ -21,7 +21,7 @@ The [gates](gates.md) enforce this order.
 
 ## Gate 1: master hull
 
-- Build one closed, low-poly quad cage for the entire exterior skin, from nose to tail and roof to lower skirt: `api.surf.master_hull(name, verts, faces, regions={...}, creases=[...], levels=4)`. It has no openings, panel gaps or mechanical detail. Name the faces of each future panel and opening as regions now.
+- Build one closed, low-poly quad cage for the entire exterior skin, from nose to tail and roof to lower skirt: `api.surf.master_hull(name, verts, faces, regions={...}, creases=[...], levels=4)` (or synthesize multi-frequency creases, taut facet planes, and semantic regions from a base cage with `api.surf.inflected_master_hull(...)`; see [procedural paneling](procedural-paneling.md)). It has no openings, panel gaps or mechanical detail. Name the faces of each future panel and opening as regions now.
 - Hold styling breaks (a chine between upper hull and skirt, a beltline) with edge creases, not congested support loops. Keep even quad flow running uninterrupted over the hull. Keep poles off tight curvature, because panels shrinkwrap poorly near them.
 - Review it alone (`selection.roles = ["guide"]`) with zebra, silhouette and overlay modes, from the calibrated camera and the `survey21` preset. Zebra bands should flow without breaks or kinks across shoulders and crowns. Iterate until the calibrated silhouette IoU meets the gate and the overlay lines up roof roll, pillar widths, crown and taper.
 - The master stays hidden and unrendered (role `guide`). After acceptance it is locked.

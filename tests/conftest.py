@@ -5,6 +5,13 @@ import trimesh
 from geometryforge import projects, backends
 from geometryforge.storage import read, write
 
+@pytest.fixture(autouse=True)
+def projects_root(tmp_path, monkeypatch):
+    """Never create or resolve projects in the real projects folder."""
+    root = tmp_path / 'gf_projects'
+    monkeypatch.setenv('GEOMETRYFORGE_PROJECTS', str(root))
+    return root
+
 @pytest.fixture
 def project(tmp_path, monkeypatch):
     monkeypatch.setattr(projects,'HOME',tmp_path/'catalog')

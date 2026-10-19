@@ -2,6 +2,8 @@
 
 Complete GeometryForge projects built by an agent with the toolkit. Each folder is a standalone project: modeling code, checks, parameters, decisions and documentation.
 
+This folder holds published showcases only. Your own projects belong in the projects folder outside the repository (`geometryforge config projects-root`; by default `GF_Projects` beside this checkout).
+
 | Project | What it shows |
 |---|---|
 | [`astraeus_lander`](astraeus_lander) | A 480 mm, 22-part display model built from one concept sheet. Native Blender and Houdini versions, eight interface checks, fit coupon, and a four-colour filament plan with a Bambu Studio print kit. |

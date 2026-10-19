@@ -409,13 +409,23 @@ def inside_opening(points, opening):
     w = np.cross(axis, u)
     polygon = np.column_stack(((V[order] - centroid) @ u, (V[order] - centroid) @ w))
     offset = points - centroid
-    sx, sy = offset @ u, offset @ w
-    inside = np.zeros(len(points), dtype=bool)
+    result = np.zeros(len(points), dtype=bool)
+    candidates = np.flatnonzero(np.abs(offset @ axis) < radius)
+    if not len(candidates):
+        return result
+    sx, sy = offset[candidates] @ u, offset[candidates] @ w
+    # Reject the rest of the vehicle before iterating a dense opening ring.
+    # This only prunes points the original plane/polygon predicate rejects.
+    lower, upper = polygon.min(axis=0), polygon.max(axis=0)
+    nearby = (sx >= lower[0]) & (sx <= upper[0]) & (sy >= lower[1]) & (sy <= upper[1])
+    candidates, sx, sy = candidates[nearby], sx[nearby], sy[nearby]
+    inside = np.zeros(len(candidates), dtype=bool)
     for (x1, y1), (x2, y2) in zip(polygon, np.roll(polygon, -1, axis=0)):
         crosses = (y1 > sy) != (y2 > sy)
         with np.errstate(divide='ignore', invalid='ignore'):
             inside ^= crosses & (sx < (x2 - x1) * (sy - y1) / (y2 - y1) + x1)
-    return inside & (np.abs(offset @ axis) < radius)
+    result[candidates] = inside
+    return result
 
 
 def mating(payload, limits, spec):

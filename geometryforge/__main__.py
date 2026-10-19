@@ -15,9 +15,13 @@ def main():
     p.add_argument('--target', help='Workspace folder to install into (default: current folder)')
     p.add_argument('--user', action='store_true', help='Install for your user account instead of one workspace')
     p.add_argument('--harness', choices=['codex','claude','both'], default='both', help='Which agent harness to install for')
-    sub.add_parser('doctor', help='Report the Blender, Houdini and Bambu Studio executables that will be used')
+    p.add_argument('--projects-root', help='Folder for new projects (default: GF_Projects beside the GeometryForge checkout)')
+    sub.add_parser('doctor', help='Report the executables that will be used and the projects folder')
+    p = sub.add_parser('config', help='Show or change settings')
+    p.add_argument('setting', choices=['projects-root'], help='projects-root: where `init NAME` creates projects')
+    p.add_argument('value', nargs='?', help='New value (omit to show the current one)')
     p = sub.add_parser('init', help='Create a new project folder (empty or from a bundled example)')
-    p.add_argument('destination', help='Empty or new project folder')
+    p.add_argument('destination', help='Project name (created in the projects folder) or an explicit empty/new folder path')
     p.add_argument('--example', choices=['desk_organizer','mechanical_prop'], help='Start from a bundled example')
     p.add_argument('--target', choices=['print','game','both'], help='Output route; creates a format-v2 project')
     p.add_argument('--id', help='Project ID (lowercase, underscores; default: folder name)')
@@ -119,12 +123,24 @@ def main():
     args=parser.parse_args()
     try:
         from . import projects, engine
+        if getattr(args, 'project', None):
+            args.project = str(projects.resolve(args.project))
         if args.command == 'install-skill':
             from .install import install
             result=install(args.target,args.harness,args.user)
+            if args.projects_root:
+                projects.set_projects_root(args.projects_root)
+            root=projects.projects_root(); root.mkdir(parents=True, exist_ok=True)
+            result['projects_root']=str(root)
         elif args.command == 'doctor':
             from .backends import doctor
             result=doctor()
+        elif args.command == 'config':
+            if args.value:
+                result=projects.set_projects_root(args.value)
+            else:
+                root=projects.projects_root()
+                result={'projects_root':str(root),'exists':root.is_dir()}
         elif args.command == 'init':
             result=projects.initialize(args.destination,args.example,args.id,args.deliverables,args.backend,args.brief,args.bed,args.target)
         elif args.command in ('context','status'):

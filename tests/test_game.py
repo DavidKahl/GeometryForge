@@ -10,6 +10,24 @@ from geometryforge import backends, engine, game, projects, targets, unreal
 from geometryforge.storage import digest, inside, read, write
 
 
+@pytest.mark.parametrize('module_name', ['game', 'blender_game'])
+def test_native_float_equivalence_preserves_tolerance_and_topology(module_name):
+    from geometryforge import blender_game
+    compare = game.evidence_equivalent if module_name == 'game' else blender_game.equivalent
+    numbers = [(0.0, 0.0), (0.0, 1e-6), (0.0, 1.01e-6), (1e6, 1e6 + .09),
+               (1e6, 1e6 + .11), (float('inf'), float('inf')),
+               (float('-inf'), float('inf')), (1.0, float('inf')),
+               (float('inf'), 1.0), (float('nan'), float('nan'))]
+    for a, b in numbers:
+        assert compare(a, b) == bool(np.isclose(a, b, atol=1e-6, rtol=1e-7))
+    assert compare({'vertices': [[0.0, .12399499, 3.0]], 'faces': [[0, 1, 2]]},
+                   {'vertices': [[0.0, .12399501, 3.0]], 'faces': [[0, 1, 2]]})
+    assert not compare({'faces': [[0, 1, 2]]}, {'faces': [[0, 2, 1]]})
+    assert not compare([1], [1.00000001])
+    assert not compare([1.0, 2.0], [1.0])
+    assert not compare({'x': 1.0}, {'y': 1.0})
+
+
 @pytest.fixture
 def game_project(project, monkeypatch):
     root,calls = project
