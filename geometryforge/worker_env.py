@@ -9,5 +9,5 @@ def worker_environment():
                'NUMBER_OF_PROCESSORS', 'PROCESSOR_ARCHITECTURE', 'SYSTEMDRIVE',
                'HOMEDRIVE', 'HOMEPATH', 'LANG', 'LC_ALL', 'DISPLAY',
                'VTK_DEFAULT_OPENGL_WINDOW', 'LP_NUM_THREADS',
-               'SESI_LMHOST', 'HOUDINI_LICENSE_SERVER', 'HOUDINI_USER_PREF_DIR'}
+               'SESI_LMHOST', 'HOUDINI_LICENSE_SERVER', 'HOUDINI_USER_PREF_DIR', 'GEOMETRYFORGE_BAKE_DEVICE'}
     return {k: v for k, v in os.environ.items() if k.upper() in allowed}

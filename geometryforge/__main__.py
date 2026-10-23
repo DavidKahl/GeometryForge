@@ -47,6 +47,11 @@ def main():
         p.add_argument('--timeout', type=int, default=900, help='Seconds per native operation')
         p.add_argument('--blender', help='Blender executable (overrides GEOMETRYFORGE_BLENDER)')
         p.add_argument('--houdini', help='Houdini executable (overrides GEOMETRYFORGE_HOUDINI)')
+        if name != 'plan':
+            p.add_argument('--live', action='store_true', help='Build in the visible Blender live session with a scripted reveal (presentation/live.toml)')
+            p.add_argument('--armed', action='store_true', help='With --live: prepare, then hold on the empty stage until Start (sidebar) or session go')
+        if name != 'verify':
+            p.add_argument('--rebuild-accepted', action='store_true', help='Rebuild locked parts of accepted gates from code; the run passes only if their geometry is identical')
     p = sub.add_parser('restore', help='Copy a safe point into a new working folder (current work is kept)')
     p.add_argument('project', nargs='?', default='.', help='Project folder (default: current folder)'); p.add_argument('--run', help='Run ID (default: the safe point)')
     p.add_argument('--target', choices=['print','game','design'], help='Restore one independently validated route')
@@ -119,7 +124,11 @@ def main():
     p.add_argument('--margin-px', type=int, default=1, help='Dilation of the edited region in pixels')
     p.add_argument('--tolerance', type=int, default=0, help='Allowed 8-bit channel difference')
     p = sub.add_parser('viewer', help='Start the local browser viewer (http://127.0.0.1:8743)'); p.add_argument('--port', type=int, default=8743, help='Port to listen on')
-    p = sub.add_parser('session', help='Inspect or stop the managed Houdini session'); p.add_argument('action', choices=['status','stop'])
+    p = sub.add_parser('session', help='Start, inspect, steer or stop a managed GUI session (Houdini, or the Blender live session)')
+    p.add_argument('action', choices=['start','status','stop','pause','resume','skip','go'], help='go starts an armed live run')
+    p.add_argument('--app', choices=['houdini','blender'], default='houdini', help='Which managed session (default: houdini)')
+    p.add_argument('--blender', help='Blender executable for start (overrides GEOMETRYFORGE_BLENDER)')
+    p.add_argument('--user-prefs', action='store_true', help='Start Blender with your preferences and add-ons instead of factory settings')
     args=parser.parse_args()
     try:
         from . import projects, engine
@@ -151,9 +160,30 @@ def main():
             from .storage import read
             result=[read(p) for p in sorted((projects.load(args.project)['root']/'.geometryforge/runs').glob('*/run.json'),reverse=True)]
         elif args.command == 'plan':
+            if args.rebuild_accepted:
+                from .gates import rebuild_accepted
+                rebuild_accepted.set(True)
             result=engine.plan(args.project,args.backend,args.parts,args.full,args.source,args.target,args.profile)
         elif args.command in ('run','verify'):
             source='scene' if args.command=='verify' else args.source
+            if getattr(args,'rebuild_accepted',False):
+                if not args.parts:
+                    raise ValueError('--rebuild-accepted needs --parts naming the accepted parts to rebuild')
+                from .gates import rebuild_accepted
+                rebuild_accepted.set(True)
+                source='code'
+            if args.armed and not args.live:
+                raise ValueError('--armed only applies to --live')
+            if args.live:
+                if args.backend=='houdini':
+                    raise ValueError('--live builds in Blender; drop --backend houdini')
+                import tomllib
+                from pathlib import Path
+                from .backends import live_settings
+                from .live_shots import settings
+                brief=Path(args.project)/'presentation'/'live.toml'
+                config=settings(tomllib.loads(brief.read_text(encoding='utf-8')) if brief.is_file() else {})
+                live_settings.set({**config,'armed':args.armed})
             result=engine.execute(args.project,args.backend,args.parts,args.full,source,args.timeout,{'blender':args.blender,'houdini':args.houdini},args.target,args.profile)
         elif args.command == 'restore':
             result=engine.restore(args.project,args.run,args.target)
@@ -193,7 +223,23 @@ def main():
         elif args.command == 'review-diff':
             from .review import diff
             result=diff(args.project,args.before,args.after,args.parts,args.margin_px,args.tolerance)
+        elif args.command == 'session' and args.app == 'blender':
+            from . import blender_session
+            if args.action=='start':
+                record=blender_session.start(args.blender,args.user_prefs)
+                result={'running':True,'pid':record['pid'],'user_prefs':record.get('user_prefs',False)}
+            elif args.action=='status':
+                result=blender_session.status()
+            elif args.action=='stop':
+                record=blender_session.current()
+                if record:
+                    blender_session.stop(record)
+                result={'running':False}
+            else:
+                result={'applied':blender_session.control('resume' if args.action=='go' else args.action)}
         elif args.command == 'session':
+            if args.action not in ('status','stop'):
+                raise ValueError('The Houdini session supports status and stop; it starts on demand')
             from .houdini import current, request, terminate
             current_session=current()
             if args.action=='stop' and current_session:

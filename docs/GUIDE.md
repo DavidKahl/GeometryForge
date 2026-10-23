@@ -13,6 +13,9 @@ Most of the time you won't type these commands yourself. Your agent runs them th
 - [Game assets and printable derivatives](GAME_ASSETS.md)
 - [Writing builders and checks](#writing-builders-and-checks)
 - [Configuration](#configuration)
+- [Gated hard-surface workflow](#gated-hard-surface-workflow)
+- [Reference and geometry review](#reference-and-geometry-review)
+- [Live builds](#live-builds)
 - [Troubleshooting](#troubleshooting)
 
 ## Working with your agent
@@ -119,14 +122,15 @@ All commands print JSON. Exit code `0` means success, `2` a failed, cancelled or
 | `geometryforge init NAME\|DIR [--example desk_organizer] [--deliverables …] [--bed X Y Z] [--brief …]` | Creates a project (a bare name goes into the projects folder) and registers it with the viewer |
 | `geometryforge context [DIR]` | Decisions, parameters, safe point, open issues, and whether working scenes changed. Start here. |
 | `geometryforge plan [DIR] [--parts …] [--backend …]` | Which parts would be rebuilt and from which source, without running anything |
-| `geometryforge run [DIR] [--parts …] [--backend …] [--full] [--source auto\|scene\|code]` | Builds, exports, checks and records a run |
-| `geometryforge verify [DIR] [--backend …] [--full]` | Re-checks the saved working scenes without running any builder |
+| `geometryforge run [DIR] [--parts …] [--backend …] [--full] [--source auto\|scene\|code] [--live [--armed]] [--rebuild-accepted]` | Builds, exports, checks and records a run; `--live` builds in the visible Blender window ([live builds](#live-builds)) |
+| `geometryforge verify [DIR] [--backend …] [--full] [--live [--armed]]` | Re-checks the saved working scenes without running any builder; `--live` replays them part by part in the Blender window |
 | `geometryforge history [DIR]` | All run records, newest first |
 | `geometryforge restore [DIR] [--run ID]` | Copies a safe point's scenes and sources into a new `working/restore-*` folder |
 | `geometryforge adopt DIR --backend blender\|houdini --file FILE` | Makes a native file you saved elsewhere the working scene |
 | `geometryforge register [DIR]` | Adds an existing project to the viewer catalog |
 | `geometryforge viewer [--port 8743]` | Starts the local viewer |
 | `geometryforge session status\|stop` | Inspects or stops the managed Houdini session |
+| `geometryforge session start\|status\|pause\|resume\|skip\|go\|stop --app blender [--user-prefs]` | Opens, steers or closes the live Blender window; `go` starts an armed run |
 | `geometryforge migrate [DIR] --format 2\|3` | Backs up and upgrades a project; format 3 enables modeling gates |
 | `geometryforge references masks\|check [DIR] [--threshold N] [--dry-run]` | Writes silhouette masks for clean reference views, or cross-checks their length, width and height |
 | `geometryforge calibrate [DIR] [--camera ID …] [--dry-run]` | Solves reference cameras from `references/correspondences.json` and writes overlays |
@@ -239,7 +243,8 @@ def verify(payload):
 | `GEOMETRYFORGE_BLENDER` | Blender executable |
 | `GEOMETRYFORGE_HOUDINI` | Houdini executable or installation folder |
 | `GEOMETRYFORGE_BAMBU` | Bambu Studio executable (optional) |
-| `GEOMETRYFORGE_HOME` | Where the viewer's project catalog and the Houdini session state live (default `~/.geometryforge`) |
+| `GEOMETRYFORGE_HOME` | Where the viewer's project catalog and the Houdini and live Blender session state live (default `~/.geometryforge`) |
+| `GEOMETRYFORGE_BAKE_DEVICE` | Texture baking device: `auto` (default: best Cycles GPU, CPU fallback), `cpu`, `optix`, `cuda`, `hip`, `oneapi` or `metal` |
 | `GEOMETRYFORGE_PROJECTS` | Projects folder for `init NAME`; overrides `geometryforge config projects-root` |
 
 ### Projects folder
@@ -368,6 +373,46 @@ Inspect the images and record remaining differences. Use identical camera settin
 
 Convex forms can still have intentional hard features. Keep top/chamfer/side breaks explicit and round only their small manufacturing radii. Bind mating parts to interface rings rather than scalar datums, and measure them with `mating` checks. Machinery in curved bodywork sits behind a painted recessed return (`recessed_pocket_extrude`) instead of standing proud of the skin. The load path (housing, races, webs into a beam or bulkhead) stays behind that return, visible only where the reference shows it. A Boolean clearance provides space for an assembly, not its mechanical purpose.
 
+## Live builds
+
+A live build runs a normal Blender run in a visible window instead of headless, and turns it into a making-of you can watch, pause or record. Each part appears in its construction stages (base mesh first, then its modifiers one by one) while a scripted viewport camera pushes in, orbits and pulls back. Afterwards the asset gets a studio (seamless backdrop, key, fill, rim and top lights), its material groups one by one, and a turntable. Headless stays the default.
+
+Nothing about the evidence changes. The project's own builders make the geometry, one part per call, and the run is checked and recorded like any other (`run.json` notes `mode: "live"`). The evidence scene is saved before any studio or material changes; those exist only in `live-presentation.blend` beside it. The camera is scripted, so a live run needs no extra agent work, and the same project records the same way every time.
+
+### Record a build
+
+```powershell
+uv run geometryforge session start --app blender          # opens the window
+uv run geometryforge verify taxi --live --armed            # or: run taxi --live --armed --parts …
+```
+
+1. Hover over the 3D viewport and press **Ctrl+Space** to maximise it.
+2. Start your screen recording (for example OBS) on the Blender window.
+3. Press **Ctrl+Shift+Enter** over the viewport (or run `session go --app blender`). After a three-second hold the first part comes in.
+
+The command returns once the evidence is written and checked; the look-dev keeps playing in the window. A new live run waits until the presentation has finished.
+
+### Replay or build new
+
+| | Command | What you see | Takes |
+|---|---|---|---|
+| **Replay** | `verify DIR --live` | The saved scene, revealed part by part in build order. Nothing is rebuilt; the checks confirm it still matches. | Minutes |
+| **Build** | `run DIR --live --parts …` | The selected parts built by their builders, on screen. | As long as a headless run, plus the reveal |
+| **Build an accepted asset** | `run DIR --live --rebuild-accepted --parts …` | Every locked part rebuilt from code. The run passes only if each part reproduces its accepted geometry exactly; otherwise it is a candidate and the acceptances stay untouched. | As long as the original runs; pass a large `--timeout` |
+
+Once every gate is accepted, all parts are locked and a plain `run` refuses them, so use replay or `--rebuild-accepted`. Limit a project with several routes to one with `--target design` (or the route you want to watch).
+
+### Controls
+
+- **Ctrl+Shift+Enter** in the viewport starts an armed run, then pauses and resumes. The GeometryForge tab in the sidebar (**N**) has Start, Pause, Resume, Skip beat, a speed slider and an optional part HUD; recordings carry no labels unless you switch the HUD on.
+- `session pause|resume|skip|go --app blender` does the same from a terminal.
+- While paused you can orbit freely; resuming eases the camera back from wherever it is. Don't edit geometry while paused: a live run never adopts edits, so the run fails and keeps a recovery copy in `~/.geometryforge/blender_session/recovery/`. Bring edits in through [editing native files by hand](#editing-native-files-by-hand).
+- `--timeout` counts build time only, not reveal beats or pauses. The window freezes while a long part builds; after a few seconds it redraws as objects are finished.
+
+### The brief: presentation/live.toml
+
+Each project can carry `presentation/live.toml` with the pacing (beat length, speed, macro pull-back frequency, turntable length), hero parts, camera cues per part (`push_in`, `low_glide`, `top_down`, `orbit_arc`), the material reveal order and the studio colours. It is not a hashed input, so tuning it never makes parts stale. Design routes carry no materials, so `[lookdev.parts]` and `[lookdev.objects]` assign presentation materials from a palette (armor, dark, inserts, metal, glass, emissive). The full format and the art direction are in the skill's [live build reference](../geometryforge/skill/references/live-build.md).
+
 ## Troubleshooting
 
 | Symptom | What to do |
@@ -382,3 +427,8 @@ Convex forms can still have intentional hard features. Keep top/chamfer/side bre
 | "Bambu Studio was not found" | Install it, set `GEOMETRYFORGE_BAMBU`, or remove `decisions.print.bambu` to get only the slicer-neutral files. |
 | Viewer port already in use | `geometryforge viewer --port 8750` |
 | A run stays "running" in the viewer | The process was interrupted. The viewer labels it *interrupted*; the safe point is unaffected. |
+| `Part … is locked by accepted gate` on a live build | Every part of an accepted gate is locked. Replay with `verify --live`, or rebuild with `run --live --rebuild-accepted --parts …`. |
+| "Blender live session is presenting; skip or wait" | The previous live run's look-dev is still playing. Wait, or press Skip beat until it ends. |
+| "Geometry edited while paused" | A live run never adopts edits. The scene was saved to the live recovery folder; continue through `adopt`. |
+| Live window shows the sidebar or toolbar | Press **N** / **T** to hide them and **Ctrl+Space** to maximise the viewport before recording. |
+| Texture bake reports "retrying on CPU" | The GPU bake failed, usually out of video memory on a large bake. The CPU retry gives the same maps, more slowly; `gf_bake` records the fallback. |

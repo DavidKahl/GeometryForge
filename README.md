@@ -27,6 +27,8 @@ How GeometryForge came to be, from hand-modeled chess pieces to agent-built, val
 - **Reference geometry review.** Render saved Blender scenes as clay, glossy, silhouette, wireframe and zebra comparisons from repeatable or calibrated cameras, including section cuts, a 21-view survey and region-invariance diffs. Retain hashed evidence without changing native scenes or safe points; see [the review guide](docs/GUIDE.md#reference-and-geometry-review).
 - **Gated hard-surface workflow.** Format 3 projects build curved hulls top-down: calibrated reference, one locked master hull, panels shrinkwrapped to it, then detail bound to interface rings. Typed checks measure seams, pockets and joints instead of mere contact. Clean six-view orthographic references calibrate every view, and detail checks count the real detail geometry against an accepted inventory, so detail can't quietly drop out; see [the gated workflow](docs/GUIDE.md#gated-hard-surface-workflow).
 - **Procedural panel inflection.** Generate faceted hulls from an editable cage with neutral `api.surf` helpers. Authored region borders can retain a protected collar so panel seams stay in place while interior facets vary; see [procedural paneling](geometryforge/skill/references/procedural-paneling.md).
+- **Live builds.** Watch a run assemble in a visible Blender window: every part appears in its construction stages under a scripted, recording-ready viewport camera, then gets studio light and materials. Replay a finished asset or rebuild it on screen, pause to look around, or arm a run and record it as a making-of. Headless stays the default; see [live builds](docs/GUIDE.md#live-builds).
+- **GPU texture baking.** Bakes run on the best available Cycles GPU backend (OptiX, CUDA, HIP, oneAPI, Metal), with an automatic CPU fallback.
 - **No AI service of its own.** GeometryForge has no API keys, model provider or chat. Your existing agent does the thinking; GeometryForge does deterministic execution and bookkeeping.
 
 ## Requirements
@@ -104,6 +106,13 @@ uv run geometryforge run organizer
 uv run geometryforge viewer
 ```
 
+To watch a build in Blender instead, open the live window and replay (or rebuild with `run organizer --live`):
+
+```powershell
+uv run geometryforge session start --app blender
+uv run geometryforge verify organizer --live --armed    # press Ctrl+Shift+Enter in the viewport to start
+```
+
 Open <http://127.0.0.1:8743> to see the result. Then start your agent in that folder and ask, for example:
 
 > Use GeometryForge to make this organizer 150 mm wide with four compartments. Keep both native projects editable, reuse unaffected checks, and show me the resulting run.
@@ -149,10 +158,11 @@ The [user guide](docs/GUIDE.md) covers the full workflow: editing native files b
 - Blender and Houdini versions are separate native implementations of the same design intent, compared by dimensions and volume. There's no automatic translation of construction history between them.
 - Project scripts are trusted local code and run unsandboxed in your applications. Only run projects you trust. See [SECURITY.md](SECURITY.md).
 - Houdini's own license terms (e.g. Apprentice: non-commercial, `.hipnc`) still apply to the files it produces.
+- Live builds are Blender only. The window freezes while a long part builds, the final rendered presentation shot isn't there yet, and you record the window yourself (for example with OBS).
 
 ## Documentation
 
-- [User guide](docs/GUIDE.md): workflow, commands, project files, multi-material printing, troubleshooting
+- [User guide](docs/GUIDE.md): workflow, commands, project files, multi-material printing, live builds, troubleshooting
 - [Architecture](docs/ARCHITECTURE.md): how runs, evidence reuse, recovery and the viewer work
 - [Validation](docs/VALIDATION.md): what has actually been verified, on what
 - [The agent skill](geometryforge/skill/SKILL.md) and its [project contract](geometryforge/skill/references/contracts.md) and [printing guidance](geometryforge/skill/references/printing.md)

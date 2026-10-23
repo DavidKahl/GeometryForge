@@ -8,11 +8,20 @@ from .process import resolve_blender, run
 from .worker_env import worker_environment
 
 native_context = ContextVar('geometryforge_native_context', default={})
+# Validated live.toml settings when a run was started with --live; None keeps Blender headless.
+live_settings = ContextVar('geometryforge_live_settings', default=None)
 
 def run_native(backend, out, entry, parameters, parts, source, timeout, executable=None):
     request = {"action": "native", "out": str(out), "entry": str(entry), "parameters": parameters,
                "parts": parts, "source": str(source) if source else None}
     request.update(native_context.get())
+    live = live_settings.get()
+    if backend == "blender" and live is not None:
+        from .blender_session import request as live_request
+        request["live"] = live
+        write(out / "request.json", request)
+        live_request(request, executable, timeout)
+        return read(out / "result.json")
     if backend == "blender":
         path = out / "request.json"
         write(path, request)
@@ -44,6 +53,10 @@ def doctor():
     result['game_pipeline'] = {'blender': 'FBX, attribute-preserving GLB, Cycles baking',
                                'houdini': 'Native SOP attributes; game exports require a supported license',
                                'profiles': ['unreal_desktop_standard', 'unreal_desktop_nanite']}
+    from .blender_session import current as live_session
+    session = live_session()
+    result['blender_live_session'] = {'running': bool(session), 'pid': session['pid'] if session else None,
+                                      'start': 'geometryforge session start --app blender'}
     from .projects import projects_root
     root = projects_root()
     result['projects_root'] = {'path': str(root), 'exists': root.is_dir(),

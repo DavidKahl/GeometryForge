@@ -181,6 +181,32 @@ def test_accepting_opens_the_next_gate_and_locks_geometry(gated):
         engine.plan(root, parts=['hull'], target='design')
 
 
+def test_rebuild_accepted_reproduces_locked_parts_or_leaves_a_candidate(gated, monkeypatch):
+    root, calls = gated
+    accept_master(root)
+    design_run(root)
+    token = gates.rebuild_accepted.set(True)
+    try:
+        route = design_run(root, parts=['hull'], source='code')
+        assert route['status'] == 'passed', route['failures']
+        assert 'hull' in calls[-1]['parts']
+        # A recipe that no longer reproduces the accepted master must not pass or replace the acceptance.
+        monkeypatch.setitem(globals(), 'closed_sphere', lambda: closed_sphere_at(1.01))
+        route = design_run(root, parts=['hull'], source='code')
+        assert route['status'] == 'candidate'
+        assert any('Locked geometry' in f and 'hull' in f for f in route['failures'])
+    finally:
+        gates.rebuild_accepted.reset(token)
+    with pytest.raises(ValueError, match='locked by accepted gate'):
+        engine.plan(root, parts=['hull'], target='design')
+
+
+def closed_sphere_at(scale):
+    import surfacing_fixtures
+    vertices, faces = surfacing_fixtures.closed_sphere()
+    return [[c*scale for c in v] for v in vertices], faces
+
+
 def test_native_edit_of_locked_geometry_is_a_candidate(gated):
     root, _ = gated
     accept_master(root)

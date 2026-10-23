@@ -2,6 +2,28 @@
 
 What has actually been verified, on what, and when. Nothing here claims a physical print. Native validation has only been done on Windows.
 
+## Live Blender builds and GPU baking (23-24 October 2026, branch `live-blender`)
+
+All native work ran in Blender 5.2.1 LTS on Windows 10 with an RTX 3080.
+
+- **Host suite:** `uv run pytest -q`, **192 passed, 5 skipped** (the skips are the opt-in native suites). New host tests cover:
+  - the shot planner: beat continuity, the angular velocity cap, macro/medium/micro framing, cues and settings validation;
+  - the live session protocol: timeout counting build time only, cancellation and the session credential;
+  - `--rebuild-accepted`: an identical rebuild of a locked part passes, a changed one is a candidate with the lock failure, and without the flag the part is still refused.
+- **Live build equals headless:** `GEOMETRYFORGE_RUN_NATIVE_LIVE=1 uv run pytest tests/test_live_native.py` built the surfacing fixture's panels gate through the live executor (one recipe call per part, no GUI) and headless. The per-part geometry hashes for `master_hull`, `body`, `skirt` and `vent` were identical.
+- **Visible window, surfacing fixture:**
+  - Master gate built live, then the panels gate built live with the accepted master lock intact (`passed`, `mode: live`).
+  - A replay (`verify --live`) and an armed replay started with `session go`.
+  - Window captures confirmed the clay build look, staged modifier reveals, push-ins and the look-dev (cyclorama, lights, turntable).
+- **Visible window, desk organizer (v1 print route):** `run --live` built it, and an armed `verify --live` started with `session go` replayed it; both passed.
+- **Fixed during these runs:**
+  - Setting the toolbar or sidebar visibility from a timer crashed Blender 5.2 until it was wrapped in a window context.
+  - Design-route outputs are hidden roles, so the reveal had nothing to show until it presented design and guide meshes.
+  - The first look-dev light energies were about 100 times too low.
+- **GPU baking:** the same 2K five-map bake (dense displaced sphere onto a low-poly sphere, 64 samples) took 46 s with OptiX and 250 s on the CPU. All five maps were pixel-identical between the two devices. The out-of-memory fallback path was not provoked.
+
+Not verified: the out-of-VRAM fallback; HIP, oneAPI and Metal; `--rebuild-accepted` on a complete real project; live builds on macOS or Linux. A live build is presentation, not review evidence. Its studio and materials exist only in `live-presentation.blend` and say nothing about the game route.
+
 ## Procedural panel seam recovery (18 October 2026)
 
 The local procedural hover-taxi study exposed seam drift through unprotected region borders, insufficient master tessellation for short curvature probes, warped closed vent floors, and excessive scalar overhead during native evidence comparison.
@@ -179,4 +201,5 @@ A wheel and source distribution were built, and the wheel installed into a separ
 - Scene inspection may still evaluate the whole assembly.
 - The viewer is local and single-user. Model scripts are trusted, unsandboxed local code.
 - macOS and Linux native operation is unverified.
+- Live builds are Blender only; the window freezes while a long part builds, and there is no built-in screen capture or final rendered shot yet.
 - The test client emits an upstream HTTPX deprecation warning; tests pass.

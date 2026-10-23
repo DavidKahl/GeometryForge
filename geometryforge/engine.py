@@ -257,7 +257,8 @@ def execute_backend(p, data, out, frozen, backend, spec, full, timeout, executab
             "native_structure": {k: result[k] for k in ('native_objects','modifiers','native_nodes') if k in result},
             "part_inputs": {n: part_inputs(p, n) for n in known}, "working_input_hash": source_hash,
             "changed_parts": sorted(changed), "rebuilt_parts": rebuild, "affected_parts": sorted(affected),
-            "parts": {}, "checks": {}, "native": artifact(p, native_path), "source": spec["source"]}
+            "parts": {}, "checks": {}, "native": artifact(p, native_path), "source": spec["source"],
+            **({"mode": result["mode"]} if "mode" in result else {})}
     data["backends"][backend] = info
     info['target'] = target
     if result.get('mesh_exports'):
