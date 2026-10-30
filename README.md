@@ -10,6 +10,24 @@ GeometryForge lets a coding agent, [Claude Code](https://docs.claude.com/en/docs
 
 ![The GeometryForge viewer showing the Astraeus Heavy Lander, its parts and its run history](docs/viewer-windows.png)
 
+### Made with GeometryForge: Astraeus Heavy Lander
+
+A 480 mm, 22-part display model an agent built from a single concept sheet, with every part kept as editable Blender and Houdini files. See [the project](projects/astraeus_lander/README.md).
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/astraeus/assembled.jpg" alt="Astraeus Heavy Lander, assembled"></td>
+    <td width="50%"><img src="docs/astraeus/exploded.jpg" alt="Astraeus Heavy Lander, exploded into its printable parts"></td>
+  </tr>
+</table>
+<table>
+  <tr>
+    <td width="33%"><img src="docs/astraeus/upper.jpg" alt="Nose cone, forward flaps and upper hull panels"></td>
+    <td width="33%"><img src="docs/astraeus/propulsion.jpg" alt="Engine skirt, aft flaps, landing legs and engine bells"></td>
+    <td width="33%"><img src="docs/astraeus/thermal_detail.jpg" alt="Hexagonal heat-shield tile band"></td>
+  </tr>
+</table>
+
 ## Watch the introduction
 
 [![AI Builds My 3D Models Now. So What's Left for Me?](https://img.youtube.com/vi/L7bTOa_qrdc/maxresdefault.jpg)](https://youtu.be/L7bTOa_qrdc)
@@ -27,6 +45,8 @@ How GeometryForge came to be, from hand-modeled chess pieces to agent-built, val
 - **Reference geometry review.** Render saved Blender scenes as clay, glossy, silhouette, wireframe and zebra comparisons from repeatable or calibrated cameras, including section cuts, a 21-view survey and region-invariance diffs. Retain hashed evidence without changing native scenes or safe points; see [the review guide](docs/GUIDE.md#reference-and-geometry-review).
 - **Gated hard-surface workflow.** Format 3 projects build curved hulls top-down: calibrated reference, one locked master hull, panels shrinkwrapped to it, then detail bound to interface rings. Typed checks measure seams, pockets and joints instead of mere contact. Clean six-view orthographic references calibrate every view, and detail checks count the real detail geometry against an accepted inventory, so detail can't quietly drop out; see [the gated workflow](docs/GUIDE.md#gated-hard-surface-workflow).
 - **Procedural panel inflection.** Generate faceted hulls from an editable cage with neutral `api.surf` helpers. Authored region borders can retain a protected collar so panel seams stay in place while interior facets vary; see [procedural paneling](geometryforge/skill/references/procedural-paneling.md).
+- **Live builds.** Watch a run assemble in a visible Blender window: every part appears in its construction stages under a scripted, recording-ready viewport camera, then gets studio light and materials. Replay a finished asset or rebuild it on screen, pause to look around, or arm a run and record it as a making-of. Headless stays the default; see [live builds](docs/GUIDE.md#live-builds).
+- **GPU texture baking.** Bakes run on the best available Cycles GPU backend (OptiX, CUDA, HIP, oneAPI, Metal), with an automatic CPU fallback.
 - **No AI service of its own.** GeometryForge has no API keys, model provider or chat. Your existing agent does the thinking; GeometryForge does deterministic execution and bookkeeping.
 
 ## Requirements
@@ -104,6 +124,13 @@ uv run geometryforge run organizer
 uv run geometryforge viewer
 ```
 
+To watch a build in Blender instead, open the live window and replay (or rebuild with `run organizer --live`):
+
+```powershell
+uv run geometryforge session start --app blender
+uv run geometryforge verify organizer --live --armed    # press Ctrl+Shift+Enter in the viewport to start
+```
+
 Open <http://127.0.0.1:8743> to see the result. Then start your agent in that folder and ask, for example:
 
 > Use GeometryForge to make this organizer 150 mm wide with four compartments. Keep both native projects editable, reuse unaffected checks, and show me the resulting run.
@@ -149,10 +176,11 @@ The [user guide](docs/GUIDE.md) covers the full workflow: editing native files b
 - Blender and Houdini versions are separate native implementations of the same design intent, compared by dimensions and volume. There's no automatic translation of construction history between them.
 - Project scripts are trusted local code and run unsandboxed in your applications. Only run projects you trust. See [SECURITY.md](SECURITY.md).
 - Houdini's own license terms (e.g. Apprentice: non-commercial, `.hipnc`) still apply to the files it produces.
+- Live builds are Blender only. The window freezes while a long part builds, the final rendered presentation shot isn't there yet, and you record the window yourself (for example with OBS).
 
 ## Documentation
 
-- [User guide](docs/GUIDE.md): workflow, commands, project files, multi-material printing, troubleshooting
+- [User guide](docs/GUIDE.md): workflow, commands, project files, multi-material printing, live builds, troubleshooting
 - [Architecture](docs/ARCHITECTURE.md): how runs, evidence reuse, recovery and the viewer work
 - [Validation](docs/VALIDATION.md): what has actually been verified, on what
 - [The agent skill](geometryforge/skill/SKILL.md) and its [project contract](geometryforge/skill/references/contracts.md) and [printing guidance](geometryforge/skill/references/printing.md)

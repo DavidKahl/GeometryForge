@@ -1,16 +1,16 @@
 {
-  "SKILL.md": "f0af3cb7884742d8db901877afa874759d5750a2aa60ce6b68710cf6dce33e0b",
-  "references\\blender.md": "1ff0b1cb4634addbcdf48e6399baed0b2e2c49a4911f9ade80a733efc90de520",
+  "SKILL.md": "7d0d9f8a673ece277fd285a7973a23f06a46d62c348178cd4dc87bdd96f1758e",
+  "references\\blender.md": "34c45545327368b191db2570a628d7650e070d0fdf3e2cee29b9a1593576f0b7",
   "references\\checks.md": "a48b3753291165e9d48d55949aba42c24cbb4f01e74d4bf7a9452e2503855bae",
   "references\\clean-references.md": "79b14e190eb92c6fd4f09faa628933c8c688bae0b906c5f5b34383544584e423",
   "references\\contracts.md": "d12117875f20df833d591bb48075e78a4353a4b114933590a911bdf088f81d13",
   "references\\conversion.md": "e96071802a1937fd7f6749e811e729a28bf5c6eda9c7194214b8c767ab1084b3",
-  "references\\game-assets.md": "84b5e996a854fab46a4fd86484af75ee58c4217d9a6f088a9ec058d5b0d5d2e4",
+  "references\\game-assets.md": "d49e295454b53f1aaceb834b5afc9375505623c190c355c2a954f3c88c0d84eb",
   "references\\gates.md": "7404847d99d42613982bfed7a943f731e9c830319334d0859641e5dac9b4cec2",
   "references\\houdini.md": "c36f87d0bc771ac6c8a20253d5b4d739932fb27f094aed35651c9b3867b0af77",
+  "references\\live-build.md": "8e0d22c496828bdb97f9def743ae06132b7848694ed23e8f00102197b6200345",
   "references\\printing.md": "78b8234da9cf5a8bb64693528592d0baf282cba7def39caa8af0f3c47b983fe8",
-  "references\\procedural-paneling.md": "3ea7a9d9a2bbc258ae559e212750099497ddf3981d8e904f27f9451a0adac828",
-  "references\\revisions.md": "fcb8201009eabf8822856b89c6cb688c3ac8af55ac7668557a31c151820a00a7",
+  "references\\revisions.md": "9022fc30b373bfffb0b646d578df83433d10b9f70dfa824de9f83a685b257f40",
   "references\\surface-modeling.md": "c6532e0c4a0a4aafe2ee872e01ec9cf87f99e3ef0c6e5074a0f0df31ff86a8b2",
   "references\\targets.md": "6cb2294cb90bdd47902a1207d251c777614656bc771c3bb3cb67813a0cf4966b"
 }

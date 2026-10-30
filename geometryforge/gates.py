@@ -4,6 +4,7 @@ Gates are ordered stages: calibration, then geometry gates such as master hull, 
 detail. Only accepted gates plus the active gate are buildable (the frontier); later parts
 stay dormant. Accepting a gate records its evidence and locks its geometry.
 """
+from contextvars import ContextVar
 from datetime import datetime, timezone
 from pathlib import Path
 import shutil
@@ -13,6 +14,9 @@ from . import projects
 from .locking import exclusive
 from .storage import digest, inside, read, write
 from .thresholds import resolve as thresholds
+
+# run --rebuild-accepted: reproduce locked parts from code instead of refusing them.
+rebuild_accepted = ContextVar('geometryforge_rebuild_accepted', default=False)
 
 KINDS = ('calibration', 'geometry')
 TEMPLATE = '''format_version = 3
@@ -149,14 +153,17 @@ def frontier(p):
 
 
 def require_buildable(p, parts):
-    """Refuse explicit selections of dormant or locked parts before anything runs."""
+    """Refuse explicit selections of dormant or locked parts before anything runs.
+
+    With rebuild_accepted set, locked parts may be rebuilt from code: the engine's lock check then requires the
+    accepted geometry hash exactly, so any difference leaves a candidate and the acceptance untouched."""
     if not declared(p) or not parts:
         return
     state = frontier(p)
     for part in parts:
         if part in state['dormant']:
             raise ValueError(f"Part {part} belongs to gate '{state['owner'][part]}'; accept gate '{state['active']}' first")
-        if part in state['locked']:
+        if part in state['locked'] and not rebuild_accepted.get():
             raise ValueError(f"Part {part} is locked by accepted gate '{state['owner'][part]}'; "
                              f"run geometryforge gate reopen {state['owner'][part]} to change it deliberately")
 

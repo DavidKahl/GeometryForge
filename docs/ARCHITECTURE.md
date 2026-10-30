@@ -20,7 +20,7 @@ After a backend's parts and checks pass, the run writes `kit/assembled.3mf` (ass
 
 Per-project OS locks serialize modifications. Atomic state/manifest writes prevent torn JSON. Candidates, failures and cancellation preserve the prior safe point. An interrupted process leaves its run record available, and the viewer labels a non-live running owner as interrupted. Source conflicts and ambiguous scope return a candidate with a reason; full checks are explicit.
 
-Houdini uses a dedicated owned GUI process with authenticated JSON loopback requests, cooperative cancellation and recovery saves before scene replacement. Actual license capabilities determine native formats. Blender uses background subprocesses. Native modules are never imported into the host environment.
+Houdini uses a dedicated owned GUI process with authenticated JSON loopback requests, cooperative cancellation and recovery saves before scene replacement. Actual license capabilities determine native formats. Blender uses background subprocesses by default; `--live` runs the same build steps in a dedicated, visible Blender GUI over the same transport, one recipe call per part with a scripted viewport reveal, and writes its evidence scene before any presentation changes. Native modules are never imported into the host environment.
 
 ## Independent v2 delivery routes
 

@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- **Live builds in Blender:** `geometryforge session start --app blender` opens a dedicated Blender window, and `run --live` builds there instead of headless.
+  - Each part is built by the project's recipe, one call per part. It is then revealed as base mesh, then its modifier stages, under a scripted viewport camera with macro, medium and micro framing and eased, speed-capped moves.
+  - After the evidence scene is saved, a look-dev reveal adds the studio, the lights and the material groups, and ends on a turntable.
+  - Pause, resume and skip work from the CLI or the viewport sidebar. Geometry edited while paused fails the run and saves a recovery copy.
+  - `presentation/live.toml` sets pacing, hero parts, camera cues and material stages; it is not a hashed input.
+  - `run.json` records `mode: "live"`, and gates, locks and checks behave exactly as in headless runs. See [live build](geometryforge/skill/references/live-build.md).
+  - `--armed` holds a prepared live run on the empty stage until Ctrl+Shift+Enter, the sidebar Start button or `session go`.
+  - `[lookdev.parts]`, `[lookdev.objects]` and `[studio.palette]` give design-route scenes presentation materials.
+- **`run --rebuild-accepted`:** rebuilds locked parts of accepted gates from code instead of refusing them. The run passes only if the geometry hashes are identical; otherwise it is a candidate and the acceptance is untouched. It allows a real live rebuild of a finished asset, or a reproducibility check.
+- **GPU texture baking:** `api.bake` uses the best Cycles GPU backend (OptiX, CUDA, HIP, oneAPI, Metal) instead of a hard-coded CPU, and falls back to the CPU when there is no GPU or a GPU bake fails (typically out of VRAM). `GEOMETRYFORGE_BAKE_DEVICE=auto|cpu|optix|cuda|hip|oneapi|metal` overrides the choice; `gf_bake` records the device and any fallback. On an RTX 3080 a 2K five-map bake took 46 s instead of 250 s, with pixel-identical maps.
+
 - **Projects folder:** new projects live outside the GeometryForge checkout. `geometryforge init NAME` creates the project in the projects folder, and every command accepts that bare name in place of a path. The folder resolves from `GEOMETRYFORGE_PROJECTS`, then `projects_root` in `~/.geometryforge/config.json` (`geometryforge config projects-root DIR`, `install-skill --projects-root DIR`), then `GF_Projects` beside the checkout (`~/GF_Projects` for a wheel install). An explicit path still places one project anywhere. `doctor` and the viewer (`GET /api/settings`, the Add project dialog) show the folder.
 - **Viewer References tab:** the clean views and other reference images of a project, with their calibration RMS. Clicking a calibrated view looks along its camera (a near-orthographic narrow lens from 300 m) and lays the reference over the model with adjustable opacity; orbiting returns to the normal view with the same framing. `GET /api/projects/{key}/references`; the artifact route also serves image files under `references/`.
 - **Orthographic calibration:** cameras with `"projection": "orthographic"` and a `"view"` (front, back, left, right, top, bottom) are solved by a linear similarity fit of scale, offset and roll from three or more datums. Silhouette scores, overlays and `camera.ref` review views work for every clean view.

@@ -21,6 +21,8 @@ For destination conversion read [conversion](references/conversion.md). Author t
 
 Read [contracts](references/contracts.md) when authoring a project. Read [Blender](references/blender.md) or [Houdini](references/houdini.md) for the selected backends.
 
+Blender runs headless by default. When the user wants to watch a build, step in by pausing, or record it as content, offer a live build: a visible Blender window with a staged reveal and scripted camera; read [live build](references/live-build.md). Say that live runs take longer than headless ones and that the window freezes briefly while long parts build. Never make live the default, and write `presentation/live.toml` with the user from the reference.
+
 For reference-driven hero geometry, follow the gated workflow below and read [surface modeling](references/surface-modeling.md). Direct native APIs are available beyond the supplied helpers. Passing technical validation does not establish reference fidelity. Protect intentional feature edges while rounding broad forms. Preserve accepted native components and verify their geometry when reusing them in a larger study.
 
 ## Reference intake
@@ -64,7 +66,7 @@ Test uncertain features with a small representative section or fit coupon before
 
 Start each resumed modeling task with `context`. Native working files, parameter choices, stale outputs and safe points belong to the project, not conversation memory. Read the referenced latest/safe run when its detailed evidence matters.
 
-Run `geometryforge plan <project>` before execution. Use the smallest meaningful part selection within the active gate; maintain source, parameter, dependency and check declarations as geometry evolves. A new run record does not imply rebuilding the whole model. Example: `geometryforge run <project> --parts nose_tip`. Locked and dormant parts are refused; a changed locked part makes the run a candidate. For edits inside a part, compare `part_id`/`normal` reviews with `review-diff` so unedited regions provably stay unchanged. Measure joints and seams with typed checks (`seam`, `recess`, `mating`, `global`); a Boolean overlap only proves that parts touch.
+Run `geometryforge plan <project>` before execution. Use the smallest meaningful part selection within the active gate; maintain source, parameter, dependency and check declarations as geometry evolves. A new run record does not imply rebuilding the whole model. Example: `geometryforge run <project> --parts nose_tip`; add `--live` to build it in the live Blender window (`session start --app blender` first). Locked and dormant parts are refused; a changed locked part makes the run a candidate. For edits inside a part, compare `part_id`/`normal` reviews with `review-diff` so unedited regions provably stay unchanged. Measure joints and seams with typed checks (`seam`, `recess`, `mating`, `global`); a Boolean overlap only proves that parts touch.
 
 In v2 choose `--target game|print|both` and the game `--profile` as needed. Inspect stage coverage and per-route safe points. Material preparation, baking, LOD and collision recipes are explicitly authored project code; `verify --full` never runs their builders. If recipes or required preparation changed, rebuild or reconcile before calling a package current. Save texture edits and declare imported texture dependencies.
 

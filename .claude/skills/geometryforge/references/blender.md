@@ -29,4 +29,6 @@ Recipes receive parts dependencies-first, so a dependent part can look up object
 
 Save editable objects, construction operands, modifiers and/or Geometry Nodes. Use the Printable collection and stable gf_part/gf_owner properties. Scene units are millimeters with scale_length=.001 and geometryforge_units='mm'. Evaluated exports include modifiers and instances; save their editable sources. gf_print_rotation_deg changes print exports only. gf_expected_bodies records intentionally separate shells.
 
+With `--live` the same steps run in a dedicated, visible Blender window (`geometryforge session start|status|pause|resume|skip|stop --app blender`) over authenticated loopback JSON jobs. That session calls the recipe once per part, so recipes must not rely on all requested parts arriving in one call. It saves recovery files before replacing an unsaved scene, and it never attaches to or terminates Blender windows it did not start. See [live build](live-build.md).
+
 The worker opens the selected scene, runs only requested part builders, saves a new native snapshot and reopens it. Revisions must preserve unselected evaluated geometry. For a hand-edited scene, use adopt then --source scene. If procedural inputs changed too, make the choice explicit rather than discarding either version.

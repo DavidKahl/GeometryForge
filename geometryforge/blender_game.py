@@ -226,6 +226,53 @@ def meshes(target='game'):
     return result
 
 
+GPU_BACKENDS = ('OPTIX', 'CUDA', 'HIP', 'ONEAPI', 'METAL')
+
+
+def bake_device():
+    """Cycles GPU backend to bake with, or None for CPU. GEOMETRYFORGE_BAKE_DEVICE=auto|cpu|optix|cuda|hip|oneapi|metal."""
+    import os
+    import bpy
+    wanted = os.environ.get('GEOMETRYFORGE_BAKE_DEVICE', 'auto').upper()
+    if wanted == 'CPU':
+        return None
+    if wanted != 'AUTO' and wanted not in GPU_BACKENDS:
+        raise ValueError(f'GEOMETRYFORGE_BAKE_DEVICE must be auto, cpu or one of {", ".join(b.lower() for b in GPU_BACKENDS)}')
+    addon = bpy.context.preferences.addons.get('cycles')
+    if addon is None:
+        return None
+    prefs = addon.preferences
+    for backend in GPU_BACKENDS if wanted == 'AUTO' else (wanted,):
+        try:
+            prefs.compute_device_type = backend
+        except TypeError:
+            continue
+        prefs.refresh_devices()
+        found = [d for d in prefs.devices if d.type == backend]
+        if found:
+            for device in prefs.devices:
+                device.use = device.type == backend
+            return backend
+    if wanted != 'AUTO':
+        raise RuntimeError(f'GEOMETRYFORGE_BAKE_DEVICE={wanted.lower()} but Cycles found no such device')
+    prefs.compute_device_type = 'NONE'
+    return None
+
+
+def bake_pass(scene, device, **options):
+    """Bake on the GPU when available; a GPU failure (typically out of VRAM on hero bakes) retries on the CPU."""
+    import bpy
+    if scene.cycles.device == 'GPU':
+        try:
+            bpy.ops.object.bake(**options)
+            return
+        except RuntimeError as exc:
+            print(f'GeometryForge: {device["backend"]} bake failed ({exc}); retrying on CPU')
+            scene.cycles.device = 'CPU'
+            device['fallback'] = str(exc)
+    bpy.ops.object.bake(**options)
+
+
 def bake(obj, sources, directory, resolution, margin, cage_extrusion, samples):
     import bpy
     if not sources or obj in sources or resolution < 16:
@@ -236,13 +283,16 @@ def bake(obj, sources, directory, resolution, margin, cage_extrusion, samples):
     scene = bpy.context.scene
     old_engine = scene.render.engine
     old_samples = scene.cycles.samples
+    old_device = scene.cycles.device
     states = {o: (o.hide_render, o.hide_get()) for o in [obj, *sources]}
     material = obj.data.materials[0]
     material.use_nodes = True
     shader = material.node_tree.nodes.get('Principled BSDF')
     result = {}
     scene.render.engine = 'CYCLES'
-    scene.cycles.device = 'CPU'
+    backend = bake_device()
+    device = {'backend': backend or 'CPU'}
+    scene.cycles.device = 'GPU' if backend else 'CPU'
     scene.cycles.samples = samples
     try:
         for channel, kind in [('base_color', 'DIFFUSE'), ('normal', 'NORMAL'), ('roughness', 'ROUGHNESS'), ('metallic', 'EMIT'), ('occlusion', 'AO')]:
@@ -280,8 +330,8 @@ def bake(obj, sources, directory, resolution, margin, cage_extrusion, samples):
                 scene.render.bake.use_pass_direct = False
                 scene.render.bake.use_pass_indirect = False
                 scene.render.bake.use_pass_color = True
-                bpy.ops.object.bake(type=kind, use_selected_to_active=True, margin=margin,
-                                    cage_extrusion=cage_extrusion, normal_space='TANGENT')
+                bake_pass(scene, device, type=kind, use_selected_to_active=True, margin=margin,
+                          cage_extrusion=cage_extrusion, normal_space='TANGENT')
             finally:
                 for tree, emission, links in replaced:
                     tree.nodes.remove(emission)
@@ -300,10 +350,12 @@ def bake(obj, sources, directory, resolution, margin, cage_extrusion, samples):
                 material.node_tree.links.new(node.outputs['Color'], shader.inputs[{'base_color':'Base Color','roughness':'Roughness','metallic':'Metallic'}[channel]])
             result[channel] = str(path)
         obj['gf_bake'] = json.dumps({'resolution': resolution, 'margin': margin, 'cage_extrusion': cage_extrusion,
-                                     'samples': samples, 'sources': [s.name for s in sources], 'maps': result})
+                                     'samples': samples, 'sources': [s.name for s in sources], 'maps': result,
+                                     'device': device})
     finally:
         scene.render.engine = old_engine
         scene.cycles.samples = old_samples
+        scene.cycles.device = old_device
         for o, (render, hidden) in states.items():
             o.hide_render = render
             o.hide_set(hidden)

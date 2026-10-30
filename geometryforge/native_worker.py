@@ -40,19 +40,27 @@ def preparation(request, api):
             stage_request = {**request, 'entry': str(Path(request['snapshot_root']) / stage['entry']), 'parts': stage['parts']}
             recipe(stage_request, api)
 
-def blender_execute(request):
+def blender_prepare(request):
     import bpy
     from geometryforge import native_api
-    from geometryforge.blender_worker import meshes
     from geometryforge.blender_scene import initialize
     if request.get("source"):
         bpy.ops.wm.open_mainfile(filepath=request["source"])
     else:
         initialize()
-    api = native_api.Blender(request)
+    return native_api.Blender(request)
+
+def blender_execute(request):
+    api = blender_prepare(request)
     if request["parts"]:
         recipe(request, api)
     preparation(request, api)
+    blender_finalize(request)
+
+def blender_finalize(request):
+    """Collect, save, reopen-compare and export; shared by headless and live runs."""
+    import bpy
+    from geometryforge.blender_worker import meshes
     target = request.get('target', 'print')
     if target != 'print':
         from geometryforge.blender_game import meshes, relocate_textures
@@ -83,7 +91,10 @@ def blender_execute(request):
     if target == 'game':
         from geometryforge.blender_game import export_fbx
         result['mesh_exports'] = export_fbx(reopened, out / 'native-fbx',request.get('previous_mesh_exports'),request.get('full',False))
+    if request.get('live') is not None:
+        result['mode'] = 'live'
     (out / "result.json").write_text(json.dumps(result), encoding="utf-8")
+    return result
 
 def houdini_execute(request, cancelled):
     import hou
