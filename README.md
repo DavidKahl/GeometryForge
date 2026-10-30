@@ -10,6 +10,24 @@ GeometryForge lets a coding agent, [Claude Code](https://docs.claude.com/en/docs
 
 ![The GeometryForge viewer showing the Astraeus Heavy Lander, its parts and its run history](docs/viewer-windows.png)
 
+### Made with GeometryForge: Astraeus Heavy Lander
+
+A 480 mm, 22-part display model an agent built from a single concept sheet, with every part kept as editable Blender and Houdini files. See [the project](projects/astraeus_lander/README.md).
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/astraeus/assembled.jpg" alt="Astraeus Heavy Lander, assembled"></td>
+    <td width="50%"><img src="docs/astraeus/exploded.jpg" alt="Astraeus Heavy Lander, exploded into its printable parts"></td>
+  </tr>
+</table>
+<table>
+  <tr>
+    <td width="33%"><img src="docs/astraeus/upper.jpg" alt="Nose cone, forward flaps and upper hull panels"></td>
+    <td width="33%"><img src="docs/astraeus/propulsion.jpg" alt="Engine skirt, aft flaps, landing legs and engine bells"></td>
+    <td width="33%"><img src="docs/astraeus/thermal_detail.jpg" alt="Hexagonal heat-shield tile band"></td>
+  </tr>
+</table>
+
 ## Watch the introduction
 
 [![AI Builds My 3D Models Now. So What's Left for Me?](https://img.youtube.com/vi/L7bTOa_qrdc/maxresdefault.jpg)](https://youtu.be/L7bTOa_qrdc)
