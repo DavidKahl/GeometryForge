@@ -49,7 +49,7 @@ jobs:
         run: |
           npx playwright install --with-deps chromium
           npm test
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-results
